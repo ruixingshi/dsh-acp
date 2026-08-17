@@ -25,7 +25,7 @@
 
 ```bash
 export DEEPSEEK_API_KEY='...'
-npx --yes dsh-acp
+npx --yes @dumbo/dsh-acp
 ```
 
 无参数启动会使用包内置的 DeepSeek provider、Agent spine、workspace instructions 和 todo/计划配置。为保持跨平台和安全的零配置默认值，内置组合不开放 bash 或文件修改工具；需要完整 coding tools、sandbox 和权限策略时，通过 `--config` 使用自己的 Harness 组合。
@@ -45,7 +45,7 @@ npx --yes . --help
 CLI 按以下顺序选择配置：显式 `--config`、当前目录的 `./cordis.yml`、包内置 standalone 配置。仓库还提供了一个最小的模型-only 示例：[examples/cordis.yml](examples/cordis.yml)。
 
 ```bash
-npx --yes dsh-acp --config /absolute/path/to/cordis.yml
+npx --yes @dumbo/dsh-acp --config /absolute/path/to/cordis.yml
 ```
 
 CLI 通过 Harness app boot 加载启动目录的 `.env`。stdout 只输出 ACP JSON-RPC 帧，日志写入 stderr。
@@ -54,7 +54,7 @@ CLI 通过 Harness app boot 加载启动目录的 `.env`。stdout 只输出 ACP 
 
 ```yaml
 - id: rich-acp
-  name: 'dsh-acp'
+  name: '@dumbo/dsh-acp'
   config:
     provider: deepseek-official
     model: deepseek-v4-pro
@@ -73,7 +73,7 @@ CLI 通过 Harness app boot 加载启动目录的 `.env`。stdout 只输出 ACP 
     "dsh-acp": {
       "type": "custom",
       "command": "npx",
-      "args": ["--yes", "dsh-acp"],
+      "args": ["--yes", "@dumbo/dsh-acp"],
       "env": {
         "DEEPSEEK_API_KEY": "..."
       }
@@ -114,7 +114,7 @@ CLI 通过 Harness app boot 加载启动目录的 `.env`。stdout 只输出 ACP 
 - `apply`、`Config`：Cordis 插件入口。
 
 ```ts
-import { DshAcpServer, type HarnessRuntime } from 'dsh-acp'
+import { DshAcpServer, type HarnessRuntime } from '@dumbo/dsh-acp'
 
 const runtime: HarnessRuntime = createRuntime()
 const server = new DshAcpServer(runtime, {
