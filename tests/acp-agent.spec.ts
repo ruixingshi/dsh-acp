@@ -146,7 +146,7 @@ describe('DshAcpAgent', () => {
       agent.initialize({ protocolVersion: 1, clientCapabilities: {} }),
     ).resolves.toMatchObject({
       protocolVersion: 1,
-      agentInfo: { name: 'deepseek-harness-acp', version: '0.1.0' },
+      agentInfo: { name: 'dsh-acp', version: '0.2.0' },
       agentCapabilities: {
         promptCapabilities: { image: false, audio: false, embeddedContext: false },
         sessionCapabilities: { close: {} },

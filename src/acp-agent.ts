@@ -102,7 +102,7 @@ export class DshAcpAgent {
     return Promise.resolve({
       protocolVersion: PROTOCOL_VERSION,
       agentInfo: {
-        name: this.options.name ?? 'deepseek-harness-acp',
+        name: this.options.name ?? 'dsh-acp',
         title: this.options.title ?? 'DeepSeek Harness',
         version: this.options.version ?? VERSION,
       },

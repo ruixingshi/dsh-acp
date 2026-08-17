@@ -94,7 +94,7 @@ describe('ACP SDK integration', () => {
       protocolVersion: 1,
       clientCapabilities: {},
     })
-    expect(initialized.agentInfo?.name).toBe('deepseek-harness-acp')
+    expect(initialized.agentInfo?.name).toBe('dsh-acp')
     const created = await connection.agent.request(methods.agent.session.new, {
       cwd: process.cwd(),
       mcpServers: [],

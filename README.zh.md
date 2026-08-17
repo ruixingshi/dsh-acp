@@ -16,39 +16,45 @@
 ## 环境要求
 
 - Node.js 22.19 或更高版本
-- pnpm
-- 一个可运行的 DeepSeek Harness Cordis 组合
+- `DEEPSEEK_API_KEY`
 - `@agentclientprotocol/sdk` 1.3.x（本包已直接依赖）
+
+## 快速开始
+
+无需全局安装，也不需要先准备 Cordis 配置：
+
+```bash
+export DEEPSEEK_API_KEY='...'
+npx --yes dsh-acp
+```
+
+无参数启动会使用包内置的 DeepSeek provider、Agent spine、workspace instructions 和 todo/计划配置。为保持跨平台和安全的零配置默认值，内置组合不开放 bash 或文件修改工具；需要完整 coding tools、sandbox 和权限策略时，通过 `--config` 使用自己的 Harness 组合。
 
 ## 本地开发
 
 ```bash
 pnpm install
 pnpm check
+npx --yes . --help
 ```
 
 `pnpm check` 依次执行类型检查、lint、构建和测试。协议与 Harness 集成测试不需要 API key。
 
-## 配置
+## 自定义配置
 
-仓库提供了一个最小的模型-only 配置：[examples/cordis.yml](examples/cordis.yml)。在现有 Harness 项目中安装本包、Agent spine 和所需 LLM provider，然后设置 `DEEPSEEK_API_KEY`：
+CLI 按以下顺序选择配置：显式 `--config`、当前目录的 `./cordis.yml`、包内置 standalone 配置。仓库还提供了一个最小的模型-only 示例：[examples/cordis.yml](examples/cordis.yml)。
 
 ```bash
-pnpm add deepseek-harness-acp \
-  @deepseek-ai/dsh-agent-spine-demo \
-  @deepseek-ai/dsh-llm-deepseek
-
-export DEEPSEEK_API_KEY='...'
-pnpm exec dsh-acp --config /absolute/path/to/cordis.yml
+npx --yes dsh-acp --config /absolute/path/to/cordis.yml
 ```
 
-CLI 默认读取当前目录的 `./cordis.yml`，并通过 Harness app boot 加载同目录的 `.env`。stdout 只输出 ACP JSON-RPC 帧，日志写入 stderr。
+CLI 通过 Harness app boot 加载启动目录的 `.env`。stdout 只输出 ACP JSON-RPC 帧，日志写入 stderr。
 
 适配器本身的 Cordis 条目如下：
 
 ```yaml
 - id: rich-acp
-  name: 'deepseek-harness-acp'
+  name: 'dsh-acp'
   config:
     provider: deepseek-official
     model: deepseek-v4-pro
@@ -64,10 +70,10 @@ CLI 默认读取当前目录的 `./cordis.yml`，并通过 Harness app boot 加�
 ```json
 {
   "agent_servers": {
-    "deepseek-harness": {
+    "dsh-acp": {
       "type": "custom",
-      "command": "/absolute/path/to/node_modules/.bin/dsh-acp",
-      "args": ["--config", "/absolute/path/to/cordis.yml"],
+      "command": "npx",
+      "args": ["--yes", "dsh-acp"],
       "env": {
         "DEEPSEEK_API_KEY": "..."
       }
@@ -76,7 +82,7 @@ CLI 默认读取当前目录的 `./cordis.yml`，并通过 Harness app boot 加�
 }
 ```
 
-生产环境建议让命令从安全的环境或 `.env` 读取 key，而不是把 key 写进编辑器设置。Zed 的 ACP 日志可通过命令面板中的 `dev: open acp logs` 查看。当前配置格式见 [Zed External Agents 文档](https://zed.dev/docs/ai/external-agents)。
+需要自定义组合时，在 `args` 后追加 `"--config", "/absolute/path/to/cordis.yml"`。生产环境建议让命令从安全的环境或 `.env` 读取 key，而不是把 key 写进编辑器设置。Zed 的 ACP 日志可通过命令面板中的 `dev: open acp logs` 查看。当前配置格式见 [Zed External Agents 文档](https://zed.dev/docs/ai/external-agents)。
 
 ## ACP 支持范围
 
@@ -108,7 +114,7 @@ CLI 默认读取当前目录的 `./cordis.yml`，并通过 Harness app boot 加�
 - `apply`、`Config`：Cordis 插件入口。
 
 ```ts
-import { DshAcpServer, type HarnessRuntime } from 'deepseek-harness-acp'
+import { DshAcpServer, type HarnessRuntime } from 'dsh-acp'
 
 const runtime: HarnessRuntime = createRuntime()
 const server = new DshAcpServer(runtime, {

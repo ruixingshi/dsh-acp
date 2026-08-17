@@ -1,5 +1,7 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { PassThrough, Readable, Writable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { client, methods, ndJsonStream, type SessionNotification } from '@agentclientprotocol/sdk'
@@ -19,6 +21,40 @@ afterEach(async () => {
 })
 
 describe.skipIf(!existsSync(bin))('built dsh-acp CLI', () => {
+  it('reports the npx command and package version', () => {
+    const help = spawnSync(process.execPath, [bin, '--help'], { encoding: 'utf8' })
+    expect(help.status).toBe(0)
+    expect(help.stderr).toBe('')
+    expect(help.stdout).toContain('npx --yes dsh-acp')
+
+    const version = spawnSync(process.execPath, [bin, '--version'], { encoding: 'utf8' })
+    expect(version.status).toBe(0)
+    expect(version.stderr).toBe('')
+    expect(version.stdout).toBe('0.2.0\n')
+  })
+
+  it('boots the bundled configuration outside a project', () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'dsh-acp-cli-'))
+    try {
+      const initialized = spawnSync(process.execPath, [bin], {
+        cwd,
+        encoding: 'utf8',
+        input:
+          '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{}}}\n',
+        timeout: 10_000,
+      })
+      expect(initialized.error).toBeUndefined()
+      expect(initialized.status).toBe(0)
+      expect(initialized.stderr).toBe('')
+      const response = JSON.parse(initialized.stdout) as {
+        result?: { agentInfo?: { name?: string; version?: string } }
+      }
+      expect(response.result?.agentInfo).toMatchObject({ name: 'dsh-acp', version: '0.2.0' })
+    } finally {
+      rmSync(cwd, { recursive: true })
+    }
+  })
+
   it('keeps stdout protocol-pure and closes cleanly on EOF', async () => {
     const diagnostics: string[] = []
     child = spawn(process.execPath, [bin, '--config', './cordis.yml'], {
@@ -53,7 +89,7 @@ describe.skipIf(!existsSync(bin))('built dsh-acp CLI', () => {
       protocolVersion: 1,
       clientCapabilities: {},
     })
-    expect(initialized.agentInfo?.name).toBe('deepseek-harness-acp')
+    expect(initialized.agentInfo?.name).toBe('dsh-acp')
     const session = await connection.agent.request(methods.agent.session.new, {
       cwd: fixture,
       mcpServers: [],

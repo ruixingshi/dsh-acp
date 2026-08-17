@@ -20,17 +20,29 @@ Requires Node.js 22.19 or newer and pnpm.
 ```bash
 pnpm install
 pnpm check
+npx --yes . --help
 ```
 
 The protocol and Harness integration suites run without an API key.
 
-## Run
+## Quick start
 
-Use the minimal composition in [examples/cordis.yml](examples/cordis.yml), or add the plugin to an existing Harness Cordis tree:
+No global install or Cordis configuration is required:
+
+```bash
+export DEEPSEEK_API_KEY='...'
+npx --yes dsh-acp
+```
+
+The bundled standalone composition includes the DeepSeek provider, Agent spine, workspace instructions, and todo/plan support. Its safe cross-platform defaults do not expose bash or file mutation tools; use `--config` for a full Harness coding-tool, sandbox, and permission composition.
+
+## Custom configuration
+
+The CLI selects an explicit `--config`, then `./cordis.yml`, then its bundled standalone defaults. Use the minimal composition in [examples/cordis.yml](examples/cordis.yml), or add the plugin to an existing Harness Cordis tree:
 
 ```yaml
 - id: rich-acp
-  name: 'deepseek-harness-acp'
+  name: 'dsh-acp'
   config:
     provider: deepseek-official
     model: deepseek-v4-pro
@@ -40,22 +52,23 @@ Use the minimal composition in [examples/cordis.yml](examples/cordis.yml), or ad
 Then start the stdio server:
 
 ```bash
-export DEEPSEEK_API_KEY='...'
-pnpm exec dsh-acp --config /absolute/path/to/cordis.yml
+npx --yes dsh-acp --config /absolute/path/to/cordis.yml
 ```
 
-The CLI defaults to `./cordis.yml`, loads the Harness environment setup, and reserves stdout for ACP JSON-RPC frames.
+The CLI loads `.env` from its launch directory and reserves stdout for ACP JSON-RPC frames.
 
 For Zed, add a custom External Agent:
 
 ```json
 {
   "agent_servers": {
-    "deepseek-harness": {
+    "dsh-acp": {
       "type": "custom",
-      "command": "/absolute/path/to/node_modules/.bin/dsh-acp",
-      "args": ["--config", "/absolute/path/to/cordis.yml"],
-      "env": {}
+      "command": "npx",
+      "args": ["--yes", "dsh-acp"],
+      "env": {
+        "DEEPSEEK_API_KEY": "..."
+      }
     }
   }
 }

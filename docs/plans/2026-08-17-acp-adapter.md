@@ -23,7 +23,7 @@
 
 **Steps:**
 
-1. Declare the `deepseek-harness-acp` package, `dsh-acp` bin, ESM exports, Node 22 engine, ACP SDK dependency, Harness peer dependencies, and test/build scripts.
+1. Declare the `dsh-acp` package and same-named bin, ESM exports, Node 22 engine, ACP SDK dependency, Harness dependencies, and test/build scripts.
 2. Configure strict TypeScript with NodeNext resolution and declaration output.
 3. Install dependencies with `pnpm install`.
 4. Run `pnpm typecheck`; expect a successful empty-project baseline.

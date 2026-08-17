@@ -1,5 +1,7 @@
-# Minimal model-only DeepSeek Harness composition. The process loads
-# DEEPSEEK_API_KEY from the environment or the working directory's .env file.
+# Standalone defaults used by `npx dsh-acp` when the working directory has no
+# cordis.yml. Deployment-specific configuration can replace this file through
+# `--config` without changing the adapter.
+
 - id: llm-deepseek
   name: '@deepseek-ai/dsh-llm-deepseek'
   config:
@@ -14,15 +16,22 @@
   config:
     persona: |
       You are a coding assistant powered by {{model}}. Your working directory is {{cwd}}.
-    workspaceContext: false
+      Verify changes with relevant checks. Keep answers brief and factual.
+    workspaceContext:
+      maxBytes: 65536
     skills:
       enabled: false
     toolBash: false
     toolJobs: false
     goals: false
 
+- id: tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'
+  config:
+    allowParallelInProgress: true
+
 - id: rich-acp
-  name: 'dsh-acp'
+  name: '../dist/index.js'
   config:
     provider: deepseek-official
     model: deepseek-v4-pro

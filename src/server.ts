@@ -25,7 +25,7 @@ export class DshAcpServer {
     private readonly options: DshAcpAgentOptions,
     private readonly logger?: AcpLogger,
   ) {
-    this.app = agent({ name: options.name ?? 'deepseek-harness-acp' })
+    this.app = agent({ name: options.name ?? 'dsh-acp' })
       .onConnect((connection) => this.acceptConnection(connection))
       .onRequest(methods.agent.initialize, ({ params }) => this.requireHandler().initialize(params))
       .onRequest(methods.agent.session.new, ({ params }) =>
