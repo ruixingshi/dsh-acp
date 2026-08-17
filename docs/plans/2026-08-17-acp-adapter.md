@@ -13,6 +13,7 @@
 ### Task 1: Scaffold the package and quality gates
 
 **Files:**
+
 - Create: `package.json`
 - Create: `tsconfig.json`
 - Create: `eslint.config.js`
@@ -30,6 +31,7 @@
 ### Task 2: Define runtime and session contracts
 
 **Files:**
+
 - Create: `src/runtime.ts`
 - Create: `src/session.ts`
 - Test: `tests/session.spec.ts`
@@ -44,6 +46,7 @@
 ### Task 3: Implement model config options
 
 **Files:**
+
 - Create: `src/model-options.ts`
 - Test: `tests/model-options.spec.ts`
 
@@ -58,6 +61,7 @@
 ### Task 4: Implement ACP content and update projection
 
 **Files:**
+
 - Create: `src/codec.ts`
 - Create: `src/projector.ts`
 - Test: `tests/codec.spec.ts`
@@ -74,6 +78,7 @@
 ### Task 5: Implement the protocol agent
 
 **Files:**
+
 - Create: `src/acp-agent.ts`
 - Test: `tests/acp-agent.spec.ts`
 
@@ -89,6 +94,7 @@
 ### Task 6: Bind the real Harness runtime
 
 **Files:**
+
 - Create: `src/harness-runtime.ts`
 - Test: `tests/harness-runtime.spec.ts`
 
@@ -104,6 +110,7 @@
 ### Task 7: Add plugin, stdio server, and CLI
 
 **Files:**
+
 - Create: `src/plugin.ts`
 - Create: `src/server.ts`
 - Create: `src/bin.ts`
@@ -123,6 +130,7 @@
 ### Task 8: Document and verify the release surface
 
 **Files:**
+
 - Create: `README.md`
 - Create: `README.zh.md`
 - Modify: `package.json`
