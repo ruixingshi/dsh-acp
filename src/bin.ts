@@ -29,7 +29,7 @@ if (values.help === true) {
   process.stdout.write(`dsh-acp ${VERSION}
 
 Usage:
-  npx --yes @dumbo/dsh-acp [options]
+  npx --yes @dumbo-ai/dsh-acp [options]
 
 Options:
   -c, --config <path>  Use a custom Cordis configuration

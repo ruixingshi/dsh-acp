@@ -25,7 +25,7 @@ describe.skipIf(!existsSync(bin))('built dsh-acp CLI', () => {
     const help = spawnSync(process.execPath, [bin, '--help'], { encoding: 'utf8' })
     expect(help.status).toBe(0)
     expect(help.stderr).toBe('')
-    expect(help.stdout).toContain('npx --yes @dumbo/dsh-acp')
+    expect(help.stdout).toContain('npx --yes @dumbo-ai/dsh-acp')
 
     const version = spawnSync(process.execPath, [bin, '--version'], { encoding: 'utf8' })
     expect(version.status).toBe(0)

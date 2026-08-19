@@ -1,4 +1,4 @@
-# Standalone defaults used by `npx @dumbo/dsh-acp` when the working directory has no
+# Standalone defaults used by `npx @dumbo-ai/dsh-acp` when the working directory has no
 # cordis.yml. Deployment-specific configuration can replace this file through
 # `--config` without changing the adapter.
 

@@ -23,7 +23,7 @@
 
 **Steps:**
 
-1. Declare the `@dumbo/dsh-acp` package and `dsh-acp` bin, ESM exports, Node 22 engine, ACP SDK dependency, Harness dependencies, and test/build scripts.
+1. Declare the `@dumbo-ai/dsh-acp` package and `dsh-acp` bin, ESM exports, Node 22 engine, ACP SDK dependency, Harness dependencies, and test/build scripts.
 2. Configure strict TypeScript with NodeNext resolution and declaration output.
 3. Install dependencies with `pnpm install`.
 4. Run `pnpm typecheck`; expect a successful empty-project baseline.

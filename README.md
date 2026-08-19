@@ -31,7 +31,7 @@ No global install or Cordis configuration is required:
 
 ```bash
 export DEEPSEEK_API_KEY='...'
-npx --yes @dumbo/dsh-acp
+npx --yes @dumbo-ai/dsh-acp
 ```
 
 The bundled standalone composition includes the DeepSeek provider, Agent spine, workspace instructions, and todo/plan support. Its safe cross-platform defaults do not expose bash or file mutation tools; use `--config` for a full Harness coding-tool, sandbox, and permission composition.
@@ -42,7 +42,7 @@ The CLI selects an explicit `--config`, then `./cordis.yml`, then its bundled st
 
 ```yaml
 - id: rich-acp
-  name: '@dumbo/dsh-acp'
+  name: '@dumbo-ai/dsh-acp'
   config:
     provider: deepseek-official
     model: deepseek-v4-pro
@@ -52,7 +52,7 @@ The CLI selects an explicit `--config`, then `./cordis.yml`, then its bundled st
 Then start the stdio server:
 
 ```bash
-npx --yes @dumbo/dsh-acp --config /absolute/path/to/cordis.yml
+npx --yes @dumbo-ai/dsh-acp --config /absolute/path/to/cordis.yml
 ```
 
 The CLI loads `.env` from its launch directory and reserves stdout for ACP JSON-RPC frames.
@@ -65,7 +65,7 @@ For Zed, add a custom External Agent:
     "dsh-acp": {
       "type": "custom",
       "command": "npx",
-      "args": ["--yes", "@dumbo/dsh-acp"],
+      "args": ["--yes", "@dumbo-ai/dsh-acp"],
       "env": {
         "DEEPSEEK_API_KEY": "..."
       }

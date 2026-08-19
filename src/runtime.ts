@@ -1,7 +1,7 @@
 /**
  * Protocol-neutral runtime contracts implemented by the DeepSeek Harness bridge.
  *
- * @module @dumbo/dsh-acp/runtime
+ * @module @dumbo-ai/dsh-acp/runtime
  */
 
 /** Provider/model route selected for one session. */

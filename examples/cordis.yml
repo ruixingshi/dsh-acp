@@ -22,7 +22,7 @@
     goals: false
 
 - id: rich-acp
-  name: '@dumbo/dsh-acp'
+  name: '@dumbo-ai/dsh-acp'
   config:
     provider: deepseek-official
     model: deepseek-v4-pro

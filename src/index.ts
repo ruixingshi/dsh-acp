@@ -1,7 +1,7 @@
 /**
  * Rich Agent Client Protocol adapter for DeepSeek Harness.
  *
- * @module @dumbo/dsh-acp
+ * @module @dumbo-ai/dsh-acp
  */
 
 export * from './acp-agent.js'
