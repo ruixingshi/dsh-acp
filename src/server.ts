@@ -23,7 +23,9 @@ export class DshAcpServer {
   constructor(
     private readonly runtime: HarnessRuntime,
     private readonly options: DshAcpAgentOptions,
-    private readonly logger?: AcpLogger,
+    private readonly logger: AcpLogger = {
+      warn: (message) => process.stderr.write(`${message}\n`),
+    },
   ) {
     this.app = agent({ name: options.name ?? 'dsh-acp' })
       .onConnect((connection) => this.acceptConnection(connection))
@@ -37,7 +39,9 @@ export class DshAcpServer {
       .onRequest(methods.agent.session.setConfigOption, ({ params }) =>
         this.requireHandler().setSessionConfigOption(params),
       )
-      .onRequest(methods.agent.session.prompt, ({ params }) => this.requireHandler().prompt(params))
+      .onRequest(methods.agent.session.prompt, ({ params, signal }) =>
+        this.promptWithCancellation(params, signal),
+      )
       .onNotification(methods.agent.session.cancel, ({ params }) =>
         this.requireHandler().cancel(params),
       )
@@ -80,8 +84,31 @@ export class DshAcpServer {
     void connection.closed
       .then(() => handler.dispose())
       .catch((error: unknown) => {
-        this.logger?.warn(`dsh-acp: connection teardown failed: ${String(error)}`)
+        this.logger.warn(`dsh-acp: connection teardown failed: ${String(error)}`)
       })
+  }
+
+  private async promptWithCancellation(
+    params: Parameters<DshAcpAgent['prompt']>[0],
+    signal: AbortSignal,
+  ): ReturnType<DshAcpAgent['prompt']> {
+    const handler = this.requireHandler()
+    let cancellationStarted = false
+    const cancel = (): void => {
+      if (cancellationStarted) return
+      cancellationStarted = true
+      void handler.cancel({ sessionId: params.sessionId }).catch((error: unknown) => {
+        this.logger.warn(`dsh-acp: prompt request cancellation failed: ${String(error)}`)
+      })
+    }
+    signal.addEventListener('abort', cancel, { once: true })
+    try {
+      const response = handler.prompt(params)
+      if (signal.aborted) cancel()
+      return await response
+    } finally {
+      signal.removeEventListener('abort', cancel)
+    }
   }
 
   private requireHandler(): DshAcpAgent {

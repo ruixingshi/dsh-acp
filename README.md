@@ -8,14 +8,15 @@ An editor-oriented ACP v1 adapter for DeepSeek Harness. It keeps the original Ha
 
 - Provider-grouped model and model-specific reasoning selectors through standard ACP session config options.
 - Provider-qualified model values, including a configured current model that is absent from an advisory catalog.
-- Streamed assistant and thought chunks, correlated tool cards and results, plan snapshots, context usage, and session title updates.
+- Committed assistant and thought content, correlated tool cards and results, plan snapshots, context usage, and session title updates. Provider attempts are committed before delivery so retry output is never duplicated.
 - One-shot Harness approval requests projected to ACP permission choices.
 - One exact Harness Agent per ACP session, created through `ctx.agents.create` and configured with `installModelSelection`.
 - Per-session cancellation and close plus idempotent connection teardown.
+- One ACP prompt owns one Harness activity interval; failures and cancellation settle only after the Agent reaches quiescence, so trailing lifecycle events cannot enter the next prompt.
 
 ## Development
 
-Requires Node.js 22.19 or newer and pnpm.
+Requires Node.js 22.19 or newer within the Node.js 22 release line, or Node.js 24 and newer, matching DeepSeek Harness.
 
 ```bash
 pnpm install
@@ -33,6 +34,8 @@ No global install or Cordis configuration is required:
 export DEEPSEEK_API_KEY='...'
 npx --yes @dumbo-ai/dsh-acp
 ```
+
+Set `DEEPSEEK_BASE_URL` when the DeepSeek provider should use a compatible endpoint instead of its public default. The CLI reads both variables from the environment or a `.env` file in its launch directory.
 
 The bundled standalone composition includes the DeepSeek provider, Agent spine, workspace instructions, and todo/plan support. Its safe cross-platform defaults do not expose bash or file mutation tools; use `--config` for a full Harness coding-tool, sandbox, and permission composition.
 
@@ -86,7 +89,7 @@ The first release creates fresh sessions only. Session list/load/resume/fork/del
 
 The package exports `DshAcpServer`, `DshAcpAgent`, `CordisHarnessRuntime`, the protocol-neutral `HarnessRuntime` and `RuntimeSession` interfaces, and the Cordis `apply`/`Config` plugin entry points.
 
-Architecture and rationale are recorded in the [design](docs/plans/2026-08-17-acp-adapter-design.md) and [ADR 0001](docs/adr/0001-protocol-runtime-separation.md). The implementation targets the official [ACP TypeScript SDK](https://github.com/agentclientprotocol/typescript-sdk) and its standardized [session config options](https://agentclientprotocol.com/rfds/session-config-options).
+Architecture and rationale are recorded in the [design](https://github.com/ruixingshi/dsh-acp/blob/main/docs/plans/2026-08-17-acp-adapter-design.md) and [ADR 0001](https://github.com/ruixingshi/dsh-acp/blob/main/docs/adr/0001-protocol-runtime-separation.md). The implementation targets the official [ACP TypeScript SDK](https://github.com/agentclientprotocol/typescript-sdk) and its standardized [session config options](https://agentclientprotocol.com/rfds/session-config-options).
 
 ## License
 

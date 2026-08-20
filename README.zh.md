@@ -7,16 +7,18 @@
 - 在 `session/new` 返回标准 `configOptions`，客户端可以展示按 provider 分组的模型选择器。
 - 模型值包含 provider，允许不同 provider 使用相同 model id；provider 未列出当前模型时也不会把当前选择隐藏掉。
 - 根据选中模型动态展示 `reasoning_effort`，切换模型后返回完整的新配置选项。
-- 流式发送 `agent_message_chunk` 和 `agent_thought_chunk`。
+- 通过 `agent_message_chunk` 和 `agent_thought_chunk` 发送已提交的回复与思考内容；provider 尝试提交后才发送，避免重试内容重复展示。
 - 映射工具开始、工具结果、计划、上下文用量和会话标题更新。
 - 将 ACP 的一次性允许/拒绝选择接入 Harness `approval/request`。
 - 每个 ACP session 对应一个由 `ctx.agents.create` 创建的独立 Harness Agent；模型切换通过 `installModelSelection` 在下一步生效。
 - 支持单 session 取消、显式关闭和连接级幂等清理。
+- 一个 ACP prompt 对应一段 Harness activity；失败和取消只会在 Agent 完全停稳后结算，尾部生命周期事件不会进入下一条 prompt。
 
 ## 环境要求
 
-- Node.js 22.19 或更高版本
+- Node.js 22.19 或更新的 Node.js 22 版本，或 Node.js 24 及更高版本（与 DeepSeek Harness 保持一致）
 - `DEEPSEEK_API_KEY`
+- 可选的 `DEEPSEEK_BASE_URL`，用于指定兼容 DeepSeek API 的接口地址
 - `@agentclientprotocol/sdk` 1.3.x（本包已直接依赖）
 
 ## 快速开始
@@ -27,6 +29,8 @@
 export DEEPSEEK_API_KEY='...'
 npx --yes @dumbo-ai/dsh-acp
 ```
+
+CLI 会从环境变量或启动目录的 `.env` 文件读取 `DEEPSEEK_API_KEY` 和可选的 `DEEPSEEK_BASE_URL`。
 
 无参数启动会使用包内置的 DeepSeek provider、Agent spine、workspace instructions 和 todo/计划配置。为保持跨平台和安全的零配置默认值，内置组合不开放 bash 或文件修改工具；需要完整 coding tools、sandbox 和权限策略时，通过 `--config` 使用自己的 Harness 组合。
 
@@ -126,8 +130,8 @@ server.connect(stream)
 
 ## 设计与协议资料
 
-- [架构设计](docs/plans/2026-08-17-acp-adapter-design.md)
-- [协议层与 Harness runtime 分离 ADR](docs/adr/0001-protocol-runtime-separation.md)
+- [架构设计](https://github.com/ruixingshi/dsh-acp/blob/main/docs/plans/2026-08-17-acp-adapter-design.md)
+- [协议层与 Harness runtime 分离 ADR](https://github.com/ruixingshi/dsh-acp/blob/main/docs/adr/0001-protocol-runtime-separation.md)
 - [ACP TypeScript SDK](https://github.com/agentclientprotocol/typescript-sdk)
 - [ACP Session Config Options](https://agentclientprotocol.com/rfds/session-config-options)
 

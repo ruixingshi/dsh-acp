@@ -6,6 +6,7 @@ import { PassThrough, Readable, Writable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import { client, methods, ndJsonStream, type SessionNotification } from '@agentclientprotocol/sdk'
 import { afterEach, describe, expect, it } from 'vitest'
+import { VERSION } from '../src/version.js'
 
 const fixture = fileURLToPath(new URL('./fixtures/cli/', import.meta.url))
 const bin = fileURLToPath(new URL('../dist/bin.js', import.meta.url))
@@ -26,11 +27,13 @@ describe.skipIf(!existsSync(bin))('built dsh-acp CLI', () => {
     expect(help.status).toBe(0)
     expect(help.stderr).toBe('')
     expect(help.stdout).toContain('npx --yes @dumbo-ai/dsh-acp')
+    expect(help.stdout).toContain('DEEPSEEK_BASE_URL')
+    expect(help.stdout).not.toContain('DSH_PERMISSION_MODE')
 
     const version = spawnSync(process.execPath, [bin, '--version'], { encoding: 'utf8' })
     expect(version.status).toBe(0)
     expect(version.stderr).toBe('')
-    expect(version.stdout).toBe('0.2.0\n')
+    expect(version.stdout).toBe(`${VERSION}\n`)
   })
 
   it('boots the bundled configuration outside a project', () => {
@@ -49,7 +52,7 @@ describe.skipIf(!existsSync(bin))('built dsh-acp CLI', () => {
       const response = JSON.parse(initialized.stdout) as {
         result?: { agentInfo?: { name?: string; version?: string } }
       }
-      expect(response.result?.agentInfo).toMatchObject({ name: 'dsh-acp', version: '0.2.0' })
+      expect(response.result?.agentInfo).toMatchObject({ name: 'dsh-acp', version: VERSION })
     } finally {
       rmSync(cwd, { recursive: true })
     }

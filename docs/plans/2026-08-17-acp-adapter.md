@@ -71,7 +71,7 @@
 
 1. Write failing tests for text/resource prompts, empty and unsupported content, assistant text, reasoning, tool start/result, malformed arguments, plan snapshots, usage, and terminal reasons.
 2. Convert supported ACP prompt blocks into one Harness user message without protocol metadata.
-3. Map Harness stream and durable events to ACP session updates without duplicating text.
+3. Map committed Harness messages and durable presentation events to ACP session updates without exposing failed provider attempts.
 4. Preserve malformed tool input as raw text and always emit a terminal tool update.
 5. Run the focused codec and projector tests; expect all cases to pass.
 

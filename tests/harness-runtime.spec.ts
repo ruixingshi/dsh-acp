@@ -3,6 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import {
   LlmAdapter,
   ReasoningEffortId,
+  createUserMessage,
   type GenerateOptions,
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
@@ -11,7 +12,7 @@ import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-test
 import { CordisHarnessRuntime } from '../src/harness-runtime.js'
 import type { RuntimeEvent, RuntimeSession } from '../src/runtime.js'
 
-type Script = StreamChunk[] | 'hang'
+type Script = StreamChunk[] | 'error' | 'hang' | 'partial-error'
 
 class ScriptedAdapter extends LlmAdapter {
   readonly requests: GenerateOptions[] = []
@@ -54,6 +55,17 @@ class ScriptedAdapter extends LlmAdapter {
     this.requests.push(options)
     const next = this.script.shift()
     if (next === undefined) throw new Error('script exhausted')
+    if (next === 'error') throw new Error('provider unavailable')
+    if (next === 'partial-error') {
+      yield { type: 'block-start', index: 0, blockType: 'text' }
+      yield { type: 'text-delta', index: 0, text: 'doomed partial' }
+      yield {
+        type: 'block-end',
+        index: 0,
+        block: { type: 'text', text: 'doomed partial' },
+      }
+      throw new Error('transient provider failure')
+    }
     if (next === 'hang') {
       yield { type: 'block-start', index: 0, blockType: 'text' }
       yield { type: 'text-delta', index: 0, text: 'partial' }
@@ -82,6 +94,15 @@ function answer(text: string): StreamChunk[] {
     { type: 'block-end', index: 1, block: { type: 'text', text } },
     { type: 'usage', usage: { inputTokens: 10, outputTokens: 5, reasoningTokens: 2 } },
     { type: 'finish', reason: { kind: 'stop' } },
+  ]
+}
+
+function maxTokens(text: string): StreamChunk[] {
+  return [
+    { type: 'block-start', index: 0, blockType: 'text' },
+    { type: 'text-delta', index: 0, text },
+    { type: 'block-end', index: 0, block: { type: 'text', text } },
+    { type: 'finish', reason: { kind: 'max-tokens' } },
   ]
 }
 
@@ -138,22 +159,21 @@ describe('CordisHarnessRuntime', () => {
     })
   })
 
-  it('drives a real Harness agent and projects live text, thought, and usage', async () => {
+  it('drives a real Harness agent and projects committed text, thought, and usage', async () => {
     harness = await makeHarness([answer('done')])
     const events: RuntimeEvent[] = []
     const session = await createSession(harness.runtime, events)
 
     await expect(session.prompt('work')).resolves.toEqual({ kind: 'completed' })
-    expect(events).toContainEqual({
-      type: 'assistant-thought',
-      text: 'check',
-      messageId: 'reasoning:1:1:0',
-    })
-    expect(events).toContainEqual({
-      type: 'assistant-text',
-      text: 'done',
-      messageId: 'assistant:1:1:1',
-    })
+    const contentEvents = events.filter(
+      (event) => event.type === 'assistant-thought' || event.type === 'assistant-text',
+    )
+    expect(contentEvents.map(({ type, text }) => ({ type, text }))).toEqual([
+      { type: 'assistant-thought', text: 'check' },
+      { type: 'assistant-text', text: 'done' },
+    ])
+    expect(contentEvents.every((event) => typeof event.messageId === 'string')).toBe(true)
+    expect(new Set(contentEvents.map((event) => event.messageId)).size).toBe(1)
     expect(events).toContainEqual({ type: 'usage', used: 15, size: 128_000 })
     expect(harness.adapter.requests[0]?.messages.at(-1)?.content).toEqual([
       { type: 'text', text: 'work' },
@@ -189,5 +209,174 @@ describe('CordisHarnessRuntime', () => {
     session.cancel()
     await expect(prompt).resolves.toEqual({ kind: 'cancelled' })
     await session.dispose()
+  })
+
+  it('does not admit the next prompt until a failed Harness activity is quiescent', async () => {
+    harness = await makeHarness(['error', answer('recovered')])
+    const session = await createSession(harness.runtime, [])
+
+    const retry = session.prompt('fail').then(
+      () => Promise.reject(new Error('failed prompt unexpectedly resolved')),
+      (error: unknown) => {
+        expect(error).toEqual(new Error('Harness turn failed: provider unavailable'))
+        return session.prompt('retry')
+      },
+    )
+    await expect(retry).resolves.toEqual({ kind: 'completed' })
+
+    expect(harness.adapter.requests).toHaveLength(2)
+  })
+
+  it('publishes only the committed assistant message after a provider retry', async () => {
+    harness = await makeHarness(['partial-error', answer('recovered')])
+    harness.ctx.on('agent/request-error', () => Promise.resolve({ kind: 'retry' }))
+    const events: RuntimeEvent[] = []
+    const session = await createSession(harness.runtime, events)
+
+    await expect(session.prompt('retry')).resolves.toEqual({ kind: 'completed' })
+
+    const contentEvents = events.filter(
+      (event) => event.type === 'assistant-thought' || event.type === 'assistant-text',
+    )
+    expect(contentEvents.map((event) => event.text)).toEqual(['check', 'recovered'])
+    expect(new Set(contentEvents.map((event) => event.messageId)).size).toBe(1)
+    expect(harness.adapter.requests).toHaveLength(2)
+  })
+
+  it('does not admit the next prompt until a cancelled Harness activity is quiescent', async () => {
+    harness = await makeHarness(['hang', answer('continued')])
+    const session = await createSession(harness.runtime, [])
+    const cancelled = session.prompt('wait')
+    await vi.waitFor(() => expect(harness?.adapter.requests).toHaveLength(1))
+
+    session.cancel()
+    await expect(cancelled).resolves.toEqual({ kind: 'cancelled' })
+    await expect(session.prompt('continue')).resolves.toEqual({ kind: 'completed' })
+
+    expect(harness.adapter.requests).toHaveLength(2)
+  })
+
+  it('settles a prompt cancelled while queued behind Harness maintenance', async () => {
+    harness = await makeHarness([])
+    const session = await createSession(harness.runtime, [])
+    const agent = harness.runtime.requireOwned(session.id).agent
+    const maintenance = agent.runMaintenance(
+      (signal) =>
+        new Promise<void>((resolve) => {
+          signal.addEventListener('abort', () => resolve(), { once: true })
+        }),
+    )
+
+    const prompt = session.prompt('queued during maintenance')
+    session.cancel()
+
+    await expect(
+      Promise.race([
+        prompt,
+        new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 100)),
+      ]),
+    ).resolves.toEqual({ kind: 'cancelled' })
+    await maintenance
+  })
+
+  it('preserves a Harness failure raised before the prompt is claimed', async () => {
+    harness = await makeHarness([answer('recovered')])
+    const session = await createSession(harness.runtime, [])
+    const agent = harness.runtime.requireOwned(session.id).agent
+    const append = agent.session.append.bind(agent.session)
+    const callAppend = append as (...args: unknown[]) => unknown
+    agent.session.append = ((type: string, ...args: unknown[]) => {
+      if (type === 'turn/start') throw new Error('session append failed')
+      return callAppend(type, ...args)
+    }) as typeof append
+
+    await expect(session.prompt('fail before claim')).rejects.toThrow(
+      'Harness turn failed: session append failed',
+    )
+    agent.session.append = append
+
+    await expect(session.prompt('retry')).resolves.toEqual({ kind: 'completed' })
+    expect(harness.adapter.requests).toHaveLength(1)
+    expect(harness.adapter.requests[0]?.messages.at(-1)?.content).toEqual([
+      { type: 'text', text: 'retry' },
+    ])
+  })
+
+  it('rejects when replacement work fails before the owned activity becomes idle', async () => {
+    harness = await makeHarness([answer('first'), 'error'])
+    const session = await createSession(harness.runtime, [])
+    const agent = harness.runtime.requireOwned(session.id).agent
+    let replacementQueued = false
+    harness.ctx.on('agent/status', ({ agent: subject, status }) => {
+      if (subject !== agent || status !== 'idle' || replacementQueued) return
+      replacementQueued = true
+      agent.followup(
+        createUserMessage({
+          content: [{ type: 'text', text: 'replacement' }],
+          source: { kind: 'plugin', plugin: 'test' },
+        }),
+      )
+    })
+
+    await expect(session.prompt('work')).rejects.toThrow(
+      'Harness turn failed: provider unavailable',
+    )
+    expect(harness.adapter.requests).toHaveLength(2)
+  })
+
+  it('reports a hook-aborted turn as ordinary completion', async () => {
+    harness = await makeHarness(['hang'])
+    const session = await createSession(harness.runtime, [])
+    const prompt = session.prompt('wait')
+    await vi.waitFor(() => expect(harness?.adapter.requests).toHaveLength(1))
+
+    harness.runtime
+      .requireOwned(session.id)
+      .agent.cancel({ kind: 'hook', reason: 'owner intervention' })
+
+    await expect(prompt).resolves.toEqual({ kind: 'completed' })
+  })
+
+  it('reports a continued max-token Harness turn as ordinary prompt completion', async () => {
+    harness = await makeHarness([maxTokens('partial'), answer('continued')])
+    const session = await createSession(harness.runtime, [])
+    const agent = harness.runtime.requireOwned(session.id).agent
+    let continuationQueued = false
+    harness.ctx.on('agent/turn-stopping', ({ agent: subject }) => {
+      if (subject !== agent || continuationQueued) return
+      continuationQueued = true
+      agent.inject(
+        createUserMessage({
+          content: [{ type: 'text', text: 'continue' }],
+          source: { kind: 'plugin', plugin: 'test' },
+        }),
+      )
+    })
+
+    await expect(session.prompt('work')).resolves.toEqual({ kind: 'completed' })
+    expect(harness.adapter.requests).toHaveLength(2)
+    expect(
+      agent.session.events.findLast((event) => event.type === 'turn/end')?.data.reason,
+    ).toEqual({ kind: 'max-tokens' })
+  })
+
+  it('removes runtime listeners after an AgentHandle disposer fails', async () => {
+    harness = await makeHarness([])
+    const current = harness
+    const session = await createSession(current.runtime, [])
+    const owned = current.runtime.requireOwned(session.id)
+    const dispose = vi
+      .spyOn(owned.handle, 'dispose')
+      .mockRejectedValue(new Error('handle cleanup failed'))
+    const state = current.runtime as unknown as { disposers: (() => unknown)[] }
+
+    try {
+      await expect(current.runtime.dispose()).rejects.toThrow('handle cleanup failed')
+      expect(state.disposers).toHaveLength(0)
+    } finally {
+      dispose.mockRestore()
+      harness = undefined
+      await current.ctx.fiber.dispose()
+    }
   })
 })

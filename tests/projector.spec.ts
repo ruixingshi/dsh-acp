@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { projectRuntimeEvent } from '../src/projector.js'
 
 describe('Harness event projection', () => {
-  it('streams assistant text and reasoning with stable message ids', () => {
+  it('projects assistant text and reasoning with stable message ids', () => {
     expect(projectRuntimeEvent({ type: 'assistant-text', text: 'hello', messageId: 'm1' })).toEqual(
       {
         sessionUpdate: 'agent_message_chunk',

@@ -13,7 +13,21 @@ describe('ACP codec', () => {
           uri: 'file:///tmp/design.md',
         },
       ]),
-    ).toBe('Inspect [resource_link name=design uri=file:///tmp/design.md]')
+    ).toBe('Inspect \n[resource_link name="design" uri="file:///tmp/design.md"]\n')
+  })
+
+  it('quotes resource link fields without merging them into adjacent text', () => {
+    expect(
+      promptToText([
+        { type: 'text', text: 'Before' },
+        {
+          type: 'resource_link',
+          name: 'design ]\nnotes',
+          uri: 'file:///tmp/a b].md',
+        },
+        { type: 'text', text: 'After' },
+      ]),
+    ).toBe('Before\n[resource_link name="design ]\\nnotes" uri="file:///tmp/a b].md"]\nAfter')
   })
 
   it('rejects empty and unsupported prompt content', () => {

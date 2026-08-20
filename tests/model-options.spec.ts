@@ -34,6 +34,17 @@ describe('model config options', () => {
     })
   })
 
+  it('rejects non-canonical model values', () => {
+    const encoded = encodeModelSelection({ provider: 'provider', model: 'model' })
+
+    expect(() => decodeModelSelection(`${encoded}%`)).toThrow('invalid model selection')
+    expect(() =>
+      decodeModelSelection(
+        `dsh:model:${Buffer.from('[ "provider", "model" ]', 'utf8').toString('base64url')}`,
+      ),
+    ).toThrow('invalid model selection')
+  })
+
   it('groups duplicate model ids by provider', () => {
     const options = buildConfigOptions(models, {
       provider: 'gateway',

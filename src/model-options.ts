@@ -42,7 +42,9 @@ export function decodeModelSelection(value: string): Pick<ModelSelection, 'provi
   ) {
     throw new Error('invalid model selection')
   }
-  return { provider: decoded[0], model: decoded[1] }
+  const selection = { provider: decoded[0], model: decoded[1] }
+  if (encodeModelSelection(selection) !== value) throw new Error('invalid model selection')
+  return selection
 }
 
 /** Resolve the effort value a selector should display for an exact model. */

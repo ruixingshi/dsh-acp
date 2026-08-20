@@ -68,6 +68,7 @@ class FakeRuntime implements HarnessRuntime {
   readonly sessions: FakeSession[] = []
   lastCreate: CreateRuntimeSessionOptions | undefined
   disposed = false
+  disposeError: Error | undefined
 
   listModels(): Promise<ModelInfo[]> {
     return Promise.resolve(catalog)
@@ -105,7 +106,7 @@ class FakeRuntime implements HarnessRuntime {
 
   dispose(): Promise<void> {
     this.disposed = true
-    return Promise.resolve()
+    return this.disposeError === undefined ? Promise.resolve() : Promise.reject(this.disposeError)
   }
 }
 
@@ -146,7 +147,7 @@ describe('DshAcpAgent', () => {
       agent.initialize({ protocolVersion: 1, clientCapabilities: {} }),
     ).resolves.toMatchObject({
       protocolVersion: 1,
-      agentInfo: { name: 'dsh-acp', version: '0.2.0' },
+      agentInfo: { name: 'dsh-acp', version: '0.2.2' },
       agentCapabilities: {
         promptCapabilities: { image: false, audio: false, embeddedContext: false },
         sessionCapabilities: { close: {} },
@@ -274,5 +275,17 @@ describe('DshAcpAgent', () => {
         mcpServers: [{ name: 'test', command: 'node', args: [], env: [] }],
       }),
     ).rejects.toThrow(/mcpServers/)
+  })
+
+  it('disposes the shared runtime after a session disposer fails', async () => {
+    const { agent, runtime } = makeHarness()
+    await newSession(agent)
+    vi.spyOn(runtime.sessions[0]!, 'dispose').mockRejectedValue(new Error('session cleanup failed'))
+    runtime.disposeError = new Error('shared runtime cleanup failed')
+
+    await expect(agent.dispose()).rejects.toThrow(
+      /session cleanup failed.*shared runtime cleanup failed/,
+    )
+    expect(runtime.disposed).toBe(true)
   })
 })

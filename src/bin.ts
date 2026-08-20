@@ -42,7 +42,6 @@ Configuration precedence:
 Environment:
   DEEPSEEK_API_KEY      DeepSeek API key
   DEEPSEEK_BASE_URL     Optional DeepSeek-compatible endpoint
-  DSH_PERMISSION_MODE   workspace-write (default) or danger-full-access
 `)
   process.exit(0)
 }

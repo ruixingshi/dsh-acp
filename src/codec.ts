@@ -12,7 +12,9 @@ export function promptToText(prompt: readonly ContentBlock[]): string {
       continue
     }
     if (block.type === 'resource_link') {
-      parts.push(`[resource_link name=${block.name} uri=${block.uri}]`)
+      parts.push(
+        `\n[resource_link name=${JSON.stringify(block.name)} uri=${JSON.stringify(block.uri)}]\n`,
+      )
       continue
     }
     throw RequestError.invalidParams(

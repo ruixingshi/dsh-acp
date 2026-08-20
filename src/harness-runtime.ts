@@ -25,7 +25,8 @@ import type {
 interface InflightPrompt {
   messageId: string
   turn: number | undefined
-  endReason: TurnEndReason | undefined
+  error: Error | undefined
+  cancelled: boolean
   resolve(reason: RuntimeStopReason): void
   reject(error: Error): void
 }
@@ -151,18 +152,13 @@ export class CordisHarnessRuntime implements HarnessRuntime {
       }),
       ctx.on('agent/inbox/discarded', ({ agent, message }) => {
         const record = this.ownedAgent(agent)
-        if (record?.inflight?.messageId === message.id) this.settle(record, { kind: 'cancelled' })
+        if (record?.inflight?.messageId === message.id) record.inflight.cancelled = true
       }),
-      ctx.on('agent/status', ({ agent, status }) => {
-        const record = this.ownedAgent(agent)
-        if (record !== undefined && status === 'idle') this.settleAtIdle(record)
-      }),
-      ctx.on('agent/error', ({ agent, turn, error }) => {
+      ctx.on('agent/error', ({ agent, error }) => {
         const record = this.ownedAgent(agent)
         const inflight = record?.inflight
         if (record === undefined || inflight === undefined) return
-        if (inflight.turn !== undefined && inflight.turn !== turn) return
-        this.reject(record, new Error(`Harness turn failed: ${errorMessage(error)}`))
+        inflight.error ??= new Error(`Harness turn failed: ${errorMessage(error)}`)
       }),
       ctx.on('approval/request', (request, next) => {
         const record = this.ownedAgent(request.agent)
@@ -293,28 +289,32 @@ export class CordisHarnessRuntime implements HarnessRuntime {
       content: [{ type: 'text', text }],
       source: { kind: 'user' },
     })
+    let inflight!: InflightPrompt
     const response = new Promise<RuntimeStopReason>((resolve, reject) => {
-      record.inflight = {
+      inflight = {
         messageId: message.id,
         turn: undefined,
-        endReason: undefined,
+        error: undefined,
+        cancelled: false,
         resolve,
         reject,
       }
     })
+    record.inflight = inflight
     try {
       record.agent.followup(message)
     } catch (error) {
       record.inflight = undefined
       throw error
     }
+    this.settleWhenQuiescent(record, inflight)
     return response
   }
 
   cancel(id: string, cause: { kind: 'user' } | { kind: 'disposed' }): void {
     const record = this.sessions.get(id)
     if (record === undefined || record.released) return
-    this.settle(record, { kind: 'cancelled' })
+    if (record.inflight !== undefined) record.inflight.cancelled = true
     record.agent.cancel(cause)
   }
 
@@ -343,23 +343,6 @@ export class CordisHarnessRuntime implements HarnessRuntime {
     const title = sessionTitle(event)
     if (title !== undefined) record.options.onEvent({ type: 'session-info', ...title })
     switch (event.type) {
-      case 'assistant/chunk': {
-        const chunk = event.data.chunk
-        if (chunk.type === 'text-delta' && chunk.text.length > 0) {
-          record.options.onEvent({
-            type: 'assistant-text',
-            text: chunk.text,
-            messageId: `assistant:${event.data.turn}:${event.data.step}:${chunk.index}`,
-          })
-        } else if (chunk.type === 'reasoning-delta' && chunk.text.length > 0) {
-          record.options.onEvent({
-            type: 'assistant-thought',
-            text: chunk.text,
-            messageId: `reasoning:${event.data.turn}:${event.data.step}:${chunk.index}`,
-          })
-        }
-        break
-      }
       case 'tool/call':
         record.options.onEvent({
           type: 'tool-call',
@@ -387,7 +370,15 @@ export class CordisHarnessRuntime implements HarnessRuntime {
       case 'request/context':
         record.contextWindow = event.data.contextWindow
         break
-      case 'assistant/message':
+      case 'assistant/message': {
+        const messageId = String(event.data.message.id)
+        for (const block of event.data.message.content) {
+          if (block.type === 'text' && block.text.length > 0) {
+            record.options.onEvent({ type: 'assistant-text', text: block.text, messageId })
+          } else if (block.type === 'reasoning' && block.text.length > 0) {
+            record.options.onEvent({ type: 'assistant-thought', text: block.text, messageId })
+          }
+        }
         if (event.data.usage !== undefined && record.contextWindow !== undefined) {
           record.options.onEvent({
             type: 'usage',
@@ -396,6 +387,7 @@ export class CordisHarnessRuntime implements HarnessRuntime {
           })
         }
         break
+      }
       case 'turn/end':
         this.onTurnEnd(record, event.data.turn, event.data.reason)
         break
@@ -408,19 +400,37 @@ export class CordisHarnessRuntime implements HarnessRuntime {
     const inflight = record.inflight
     if (inflight?.turn !== turn) return
     if (reason.kind === 'error') {
-      this.reject(record, new Error(`Harness turn failed: ${reason.error.message}`))
-      return
+      inflight.error ??= new Error(`Harness turn failed: ${reason.error.message}`)
     }
-    inflight.endReason = reason
   }
 
-  private settleAtIdle(record: OwnedSession): void {
+  private settleWhenQuiescent(record: OwnedSession, inflight: InflightPrompt): void {
+    void record.agent.whenIdle().then(
+      () => {
+        if (record.inflight === inflight) this.settleAfterQuiescence(record)
+      },
+      (error: unknown) => {
+        if (record.inflight !== inflight) return
+        this.reject(
+          record,
+          inflight.error ?? new Error(`Harness quiescence wait failed: ${errorMessage(error)}`),
+        )
+      },
+    )
+  }
+
+  private settleAfterQuiescence(record: OwnedSession): void {
     const inflight = record.inflight
     if (inflight === undefined) return
-    if (inflight.turn === undefined || inflight.endReason?.kind === 'aborted') {
+    if (inflight.cancelled) {
       this.settle(record, { kind: 'cancelled' })
-    } else if (inflight.endReason?.kind === 'max-tokens') {
-      this.settle(record, { kind: 'max-tokens' })
+    } else if (inflight.error !== undefined) {
+      if (inflight.turn === undefined) {
+        record.agent.cancel({ kind: 'hook', reason: 'dsh-acp prompt failed before inbox claim' })
+      }
+      this.reject(record, inflight.error)
+    } else if (inflight.turn === undefined) {
+      this.settle(record, { kind: 'cancelled' })
     } else {
       this.settle(record, { kind: 'completed' })
     }
@@ -443,7 +453,23 @@ export class CordisHarnessRuntime implements HarnessRuntime {
   private async disposeOnce(): Promise<void> {
     this.closed = true
     const ids = [...this.sessions.keys()]
-    await Promise.all(ids.map((id) => this.release(id)))
-    for (const dispose of this.disposers.splice(0).reverse()) dispose()
+    const results = await Promise.allSettled(ids.map((id) => this.release(id)))
+    const failures = results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : [],
+    )
+    for (const dispose of this.disposers.splice(0).reverse()) {
+      try {
+        await dispose()
+      } catch (error: unknown) {
+        failures.push(error)
+      }
+    }
+    if (failures.length === 1) throw failures[0]
+    if (failures.length > 1) {
+      throw new AggregateError(
+        failures,
+        `${failures.length} Harness resources failed to dispose: ${failures.map(String).join('; ')}`,
+      )
+    }
   }
 }

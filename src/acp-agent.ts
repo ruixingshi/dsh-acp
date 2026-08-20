@@ -246,8 +246,11 @@ export class DshAcpAgent {
     const record = this.requireSession(params.sessionId)
     this.sessions.delete(params.sessionId)
     record.runtime.cancel()
-    await record.runtime.dispose()
-    await record.updateTail
+    try {
+      await record.runtime.dispose()
+    } finally {
+      await record.updateTail
+    }
     return {}
   }
 
@@ -261,13 +264,30 @@ export class DshAcpAgent {
     const records = [...this.sessions.values()]
     this.sessions.clear()
     for (const record of records) record.runtime.cancel()
-    await Promise.all(
+    const results = await Promise.allSettled(
       records.map(async (record) => {
-        await record.runtime.dispose()
-        await record.updateTail
+        try {
+          await record.runtime.dispose()
+        } finally {
+          await record.updateTail
+        }
       }),
     )
-    await this.runtime.dispose()
+    const failures = results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : [],
+    )
+    try {
+      await this.runtime.dispose()
+    } catch (error: unknown) {
+      failures.push(error)
+    }
+    if (failures.length === 1) throw failures[0]
+    if (failures.length > 1) {
+      throw new AggregateError(
+        failures,
+        `${failures.length} ACP resources failed to dispose: ${failures.map(String).join('; ')}`,
+      )
+    }
   }
 
   private assertOpen(): void {
