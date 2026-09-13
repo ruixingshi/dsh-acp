@@ -28,7 +28,9 @@ describe.skipIf(!existsSync(bin))('built dsh-acp CLI', () => {
     expect(help.stderr).toBe('')
     expect(help.stdout).toContain('npx --yes @dumbo-ai/dsh-acp')
     expect(help.stdout).toContain('DEEPSEEK_BASE_URL')
-    expect(help.stdout).not.toContain('DSH_PERMISSION_MODE')
+    expect(help.stdout).toContain('DSH_PERMISSION_MODE')
+    expect(help.stdout).toContain('--patch <path>')
+    expect(help.stdout).toContain('official ACP profile')
 
     const version = spawnSync(process.execPath, [bin, '--version'], { encoding: 'utf8' })
     expect(version.status).toBe(0)
@@ -36,26 +38,65 @@ describe.skipIf(!existsSync(bin))('built dsh-acp CLI', () => {
     expect(version.stdout).toBe(`${VERSION}\n`)
   })
 
-  it('boots the bundled configuration outside a project', () => {
+  it('boots the official ACP profile and publishes model options', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'dsh-acp-cli-'))
+    const diagnostics: string[] = []
     try {
-      const initialized = spawnSync(process.execPath, [bin], {
+      child = spawn(process.execPath, [bin], {
         cwd,
-        encoding: 'utf8',
-        input:
-          '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{}}}\n',
-        timeout: 10_000,
+        env: {
+          ...process.env,
+          DSH_HOME: join(cwd, '.dsh'),
+          DSH_TELEMETRY_DISABLED: '1',
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
       })
-      expect(initialized.error).toBeUndefined()
-      expect(initialized.status).toBe(0)
-      expect(initialized.stderr).toBe('')
-      const response = JSON.parse(initialized.stdout) as {
-        result?: { agentInfo?: { name?: string; version?: string } }
-      }
-      expect(response.result?.agentInfo).toMatchObject({ name: 'dsh-acp', version: VERSION })
+      child.stderr.setEncoding('utf8')
+      child.stderr.on('data', (chunk: string) => diagnostics.push(chunk))
+      const app = client({ name: 'official-cli-test' })
+      const connection = app.connect(
+        ndJsonStream(
+          Writable.toWeb(child.stdin) as WritableStream<Uint8Array>,
+          Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>,
+        ),
+      )
+
+      const initialized = await connection.agent.request(methods.agent.initialize, {
+        protocolVersion: 1,
+        clientCapabilities: {},
+      })
+      expect(initialized.agentInfo).toMatchObject({ name: 'deepseek-harness-acp' })
+      const session = await connection.agent.request(methods.agent.session.new, {
+        cwd,
+        mcpServers: [],
+      })
+      expect(session.configOptions?.some(({ id }) => id === 'model')).toBe(true)
+      await connection.agent.request(methods.agent.session.close, {
+        sessionId: session.sessionId,
+      })
+
+      const running = child
+      const exited = new Promise<number | null>((resolve) => {
+        running.once('exit', (code) => resolve(code))
+      })
+      connection.close()
+      child.stdin.end()
+      await connection.closed
+      await expect(exited).resolves.toBe(0)
+      expect(diagnostics.join('')).toBe('')
+      child = undefined
     } finally {
       rmSync(cwd, { recursive: true })
     }
+  }, 30_000)
+
+  it('rejects profile patches in legacy complete-config mode', () => {
+    const result = spawnSync(process.execPath, [bin, '--patch', './extra.yml'], {
+      cwd: fixture,
+      encoding: 'utf8',
+    })
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('--patch cannot be combined with --config or ./cordis.yml')
   })
 
   it('keeps stdout protocol-pure and closes cleanly on EOF', async () => {

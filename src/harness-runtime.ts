@@ -1,6 +1,7 @@
 /** DeepSeek Harness implementation of the protocol-neutral runtime contracts. */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { brandString } from '@deepseek-ai/dsh-brand'
 import { ReasoningEffortId, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, TokenUsage } from '@deepseek-ai/dsh-llm'
 import {
@@ -9,7 +10,8 @@ import {
   type AgentHandle,
   type ModelSelectionRef,
 } from '@deepseek-ai/dsh-agent'
-import { SessionId, type SessionEvent, type TurnEndReason } from '@deepseek-ai/dsh-session'
+import type { SessionEvent, SessionId, TurnEndReason } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-tool-todo'
 import type {} from '@deepseek-ai/dsh-user-approval'
 import type {
   CreateRuntimeSessionOptions,
@@ -246,7 +248,7 @@ export class CordisHarnessRuntime implements HarnessRuntime {
       assembled: undefined,
     }
     const handle = await this.agents.create({
-      sessionId: SessionId(options.sessionId),
+      sessionId: brandString<SessionId>(options.sessionId),
       meta: { cwd: options.cwd },
       agentOptions: { provider: options.selection.provider, model: options.selection.model },
       setup: (agentCtx) => {

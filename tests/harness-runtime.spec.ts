@@ -115,7 +115,7 @@ interface RuntimeHarness {
 async function makeHarness(script: Script[]): Promise<RuntimeHarness> {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx, {
-    systemPrompt: { persona: 'Selected {{model}} in {{cwd}}.' },
+    systemPrompt: { personaPrefix: 'Selected {{model}} in {{cwd}}.' },
   })
   await ctx.plugin(AgentLoop, { agents: [] })
   const adapter = new ScriptedAdapter(script)
@@ -196,7 +196,11 @@ describe('CordisHarnessRuntime', () => {
       { model: 'pro', reasoningEffort: 'max' },
       { model: 'flash', reasoningEffort: 'off' },
     ])
-    expect(harness.adapter.requests[1]?.system).toContain('Selected flash')
+    expect(
+      harness.adapter.requests[1]?.messages
+        .find(({ role }) => role === 'system')
+        ?.content.some((block) => block.type === 'text' && block.text.includes('Selected flash')),
+    ).toBe(true)
   })
 
   it('settles an explicit cancellation and drains the Harness driver', async () => {
@@ -356,7 +360,7 @@ describe('CordisHarnessRuntime', () => {
     await expect(session.prompt('work')).resolves.toEqual({ kind: 'completed' })
     expect(harness.adapter.requests).toHaveLength(2)
     expect(
-      agent.session.events.findLast((event) => event.type === 'turn/end')?.data.reason,
+      agent.session.snapshotEvents().findLast((event) => event.type === 'turn/end')?.data.reason,
     ).toEqual({ kind: 'max-tokens' })
   })
 

@@ -8,7 +8,6 @@ interface PackageManifest {
   dependencies?: Record<string, string>
   devDependencies?: Record<string, string>
   engines?: Record<string, string>
-  peerDependencies?: Record<string, string>
 }
 
 function readManifest(path: string): PackageManifest {
@@ -30,26 +29,21 @@ describe('published manifest', () => {
     expect(root.engines?.node).toBe('^22.19.0 || >=24.0.0')
   })
 
-  it('pins the complete standalone Harness peer closure to one release', () => {
+  it('pins every directly consumed Harness package to the official CLI release', () => {
     const root = readManifest(join(process.cwd(), 'package.json'))
     const dependencies = root.dependencies ?? {}
-    const version = dependencies['@deepseek-ai/dsh-agent']
+    const version = dependencies['@deepseek-ai/dsh']
     expect(version).toBeDefined()
-    expect(root.devDependencies?.['@deepseek-ai/dsh-agent-loop-testkit']).toBe(version)
-
-    const pending = Object.keys(dependencies).filter(isDshPackage)
-    const visited = new Set<string>()
-    while (pending.length > 0) {
-      const name = pending.pop()
-      if (name === undefined || visited.has(name)) continue
-      visited.add(name)
-      expect(dependencies[name], name).toBe(version)
-
-      const manifest = readManifest(join(process.cwd(), 'node_modules', name, 'package.json'))
-      for (const peer of Object.keys(manifest.peerDependencies ?? {}).filter(isDshPackage)) {
-        expect(dependencies[peer], `${name} requires ${peer}`).toBe(version)
-        pending.push(peer)
-      }
+    expect(dependencies['@deepseek-ai/dsh-agent-spine-demo']).toBeUndefined()
+    for (const [name, dependencyVersion] of Object.entries(dependencies).filter(([name]) =>
+      isDshPackage(name),
+    )) {
+      expect(dependencyVersion, name).toBe(version)
+    }
+    for (const [name, dependencyVersion] of Object.entries(root.devDependencies ?? {}).filter(
+      ([name]) => isDshPackage(name),
+    )) {
+      expect(dependencyVersion, name).toBe(version)
     }
   })
 })

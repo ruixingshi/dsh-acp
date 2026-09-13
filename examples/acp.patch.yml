@@ -1,0 +1,6 @@
+# Optional patch for the official DeepSeek Harness ACP profile.
+
+- id: acp
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-pro

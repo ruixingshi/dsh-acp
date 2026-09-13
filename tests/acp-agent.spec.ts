@@ -15,6 +15,7 @@ import type {
   RuntimeSession,
   RuntimeStopReason,
 } from '../src/runtime.js'
+import { VERSION } from '../src/version.js'
 
 const catalog: ModelInfo[] = [
   {
@@ -147,7 +148,7 @@ describe('DshAcpAgent', () => {
       agent.initialize({ protocolVersion: 1, clientCapabilities: {} }),
     ).resolves.toMatchObject({
       protocolVersion: 1,
-      agentInfo: { name: 'dsh-acp', version: '0.2.2' },
+      agentInfo: { name: 'dsh-acp', version: VERSION },
       agentCapabilities: {
         promptCapabilities: { image: false, audio: false, embeddedContext: false },
         sessionCapabilities: { close: {} },
