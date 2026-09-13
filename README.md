@@ -1,6 +1,6 @@
 # DeepSeek Harness ACP
 
-`@dumbo-ai/dsh-acp` provides a stable `npx` entry point for the official DeepSeek Harness ACP application. Version 0.3.0 uses DeepSeek Harness `0.1.5-rc.2` and its maintained `acp` profile by default, while retaining the package's earlier TypeScript adapter API and complete-Cordis configuration mode for existing integrations.
+`@dumbo-ai/dsh-acp` provides a stable `npx` entry point for the official DeepSeek Harness ACP application. Version 0.3.1 uses DeepSeek Harness `0.1.5-rc.2` and its maintained `acp` profile by default, while retaining the package's earlier TypeScript adapter API and complete-Cordis configuration mode for existing integrations.
 
 [中文文档](README.zh.md)
 

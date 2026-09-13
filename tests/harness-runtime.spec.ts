@@ -9,6 +9,7 @@ import {
 } from '@deepseek-ai/dsh-llm'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import type { TurnEndReason } from '@deepseek-ai/dsh-session'
 import { CordisHarnessRuntime } from '../src/harness-runtime.js'
 import type { RuntimeEvent, RuntimeSession } from '../src/runtime.js'
 
@@ -345,7 +346,13 @@ describe('CordisHarnessRuntime', () => {
     harness = await makeHarness([maxTokens('partial'), answer('continued')])
     const session = await createSession(harness.runtime, [])
     const agent = harness.runtime.requireOwned(session.id).agent
+    const turnEndReasons: TurnEndReason[] = []
     let continuationQueued = false
+    harness.ctx.on('session/event', (subject, event) => {
+      if (subject === agent.session && event.type === 'turn/end') {
+        turnEndReasons.push(event.data.reason)
+      }
+    })
     harness.ctx.on('agent/turn-stopping', ({ agent: subject }) => {
       if (subject !== agent || continuationQueued) return
       continuationQueued = true
@@ -359,9 +366,7 @@ describe('CordisHarnessRuntime', () => {
 
     await expect(session.prompt('work')).resolves.toEqual({ kind: 'completed' })
     expect(harness.adapter.requests).toHaveLength(2)
-    expect(
-      agent.session.snapshotEvents().findLast((event) => event.type === 'turn/end')?.data.reason,
-    ).toEqual({ kind: 'max-tokens' })
+    expect(turnEndReasons.at(-1)).toEqual({ kind: 'max-tokens' })
   })
 
   it('removes runtime listeners after an AgentHandle disposer fails', async () => {

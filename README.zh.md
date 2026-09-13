@@ -1,6 +1,6 @@
 # DeepSeek Harness ACP
 
-`@dumbo-ai/dsh-acp` 为 DeepSeek Harness 官方 ACP 应用提供稳定的 `npx` 启动入口。0.3.0 默认使用 DeepSeek Harness `0.1.5-rc.2` 维护的 `acp` profile，同时保留本包原有的 TypeScript 适配器 API 和完整 Cordis 配置模式，避免已有集成失效。
+`@dumbo-ai/dsh-acp` 为 DeepSeek Harness 官方 ACP 应用提供稳定的 `npx` 启动入口。0.3.1 默认使用 DeepSeek Harness `0.1.5-rc.2` 维护的 `acp` profile，同时保留本包原有的 TypeScript 适配器 API 和完整 Cordis 配置模式，避免已有集成失效。
 
 ## 快速开始
 

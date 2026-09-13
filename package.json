@@ -1,6 +1,6 @@
 {
   "name": "@dumbo-ai/dsh-acp",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "DeepSeek Harness ACP launcher with a compatibility adapter API",
   "type": "module",
   "license": "Apache-2.0",
