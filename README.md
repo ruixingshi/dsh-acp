@@ -1,6 +1,6 @@
 # DeepSeek Harness ACP
 
-`@dumbo-ai/dsh-acp` provides a stable `npx` entry point for the official DeepSeek Harness ACP application. Version 0.3.1 uses DeepSeek Harness `0.1.5-rc.2` and its maintained `acp` profile by default, while retaining the package's earlier TypeScript adapter API and complete-Cordis configuration mode for existing integrations.
+`@dumbo-ai/dsh-acp` provides a stable `npx` entry point for the official DeepSeek Harness ACP application. Version 0.4.0 uses DeepSeek Harness `0.1.6-alpha.1` and its maintained `acp` profile by default, while retaining the package's earlier TypeScript adapter API and complete-Cordis configuration mode for existing integrations.
 
 [中文文档](README.zh.md)
 
@@ -18,7 +18,7 @@ The default command starts the official DeepSeek Harness ACP profile. That profi
 The launcher recognizes these environment variables:
 
 - `DEEPSEEK_API_KEY`: DeepSeek API key.
-- `DEEPSEEK_BASE_URL`: optional DeepSeek-compatible endpoint inherited by the Harness process.
+- `DEEPSEEK_BASE_URL`: optional DeepSeek-compatible endpoint inherited by the Harness process. Custom endpoints are preserved. For the official DeepSeek service, omit this variable or use `https://api.deepseek.com/anthropic`; the old API-root override is no longer appropriate for the default Messages route.
 - `DSH_HOME`: optional Harness state, settings, credentials, sessions, and profile directory.
 - `DSH_PERMISSION_MODE`: optional Harness permission preset such as `read-only`, `workspace-write`, or `danger-full-access`.
 
@@ -74,7 +74,8 @@ The default official profile supports:
 - Creating, listing, resuming, prompting, cancelling, and closing persistent sessions.
 - Standard model and reasoning-effort configuration options.
 - Ordered text and resource links, plus supported raster images when the selected model route accepts images.
-- Standard stdio and Streamable HTTP MCP server declarations.
+- Standard stdio and Streamable HTTP MCP server declarations, MCP protocol negotiation and paginated tool discovery, including servers that expose no tools.
+- Shared MCP resource discovery, direct reads, and URI-template completion supplied by the Harness profile.
 - Committed message and thought updates, generic tool lifecycle, configuration changes, context usage, and permission requests.
 - Prompt and close settlement only after the Harness Agent and ordered update stream become quiescent.
 

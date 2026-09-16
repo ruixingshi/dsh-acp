@@ -35,6 +35,7 @@ describe('published manifest', () => {
     const version = dependencies['@deepseek-ai/dsh']
     expect(version).toBeDefined()
     expect(dependencies['@deepseek-ai/dsh-agent-spine-demo']).toBeUndefined()
+    expect(dependencies['@deepseek-ai/dsh-code-runtime']).toBeUndefined()
     for (const [name, dependencyVersion] of Object.entries(dependencies).filter(([name]) =>
       isDshPackage(name),
     )) {

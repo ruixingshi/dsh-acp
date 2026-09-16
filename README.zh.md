@@ -1,6 +1,6 @@
 # DeepSeek Harness ACP
 
-`@dumbo-ai/dsh-acp` 为 DeepSeek Harness 官方 ACP 应用提供稳定的 `npx` 启动入口。0.3.1 默认使用 DeepSeek Harness `0.1.5-rc.2` 维护的 `acp` profile，同时保留本包原有的 TypeScript 适配器 API 和完整 Cordis 配置模式，避免已有集成失效。
+`@dumbo-ai/dsh-acp` 为 DeepSeek Harness 官方 ACP 应用提供稳定的 `npx` 启动入口。0.4.0 默认使用 DeepSeek Harness `0.1.6-alpha.1` 维护的 `acp` profile，同时保留本包原有的 TypeScript 适配器 API 和完整 Cordis 配置模式，避免已有集成失效。
 
 ## 快速开始
 
@@ -16,7 +16,7 @@ npx --yes @dumbo-ai/dsh-acp
 启动器识别以下环境变量：
 
 - `DEEPSEEK_API_KEY`：DeepSeek API Key。
-- `DEEPSEEK_BASE_URL`：可选，传给 Harness 进程的 DeepSeek 兼容接口地址。
+- `DEEPSEEK_BASE_URL`：可选，传给 Harness 进程的 DeepSeek 兼容接口地址。自定义接口地址保持原样；使用 DeepSeek 官方服务时应删除该变量，或填写 `https://api.deepseek.com/anthropic`，旧的 API 根地址不再适用于默认 Messages 路由。
 - `DSH_HOME`：可选，Harness 的状态、设置、凭据、会话和 profile 目录。
 - `DSH_PERMISSION_MODE`：可选，Harness 权限预设，例如 `read-only`、`workspace-write` 或 `danger-full-access`。
 
@@ -72,7 +72,8 @@ CLI 会把 stdout 专门留给 ACP JSON-RPC 帧，诊断信息写入 stderr。
 - 创建、列出、恢复、提示、取消和关闭持久会话。
 - 标准模型与推理强度配置项。
 - 有序文本和 resource link；当选中模型支持图片时，也支持相应的栅格图片输入。
-- 标准 stdio 和 Streamable HTTP MCP server 配置。
+- 标准 stdio 和 Streamable HTTP MCP server 配置、MCP 协议协商与分页工具发现，也支持没有暴露工具的 server。
+- Harness profile 提供的共享 MCP resource 发现、直接读取与 URI 模板补全。
 - 已提交的消息与思考、通用工具生命周期、配置变化、上下文用量和权限请求。
 - 只有在 Harness Agent 和有序更新流完全停稳后，prompt 和 close 才会结束。
 
