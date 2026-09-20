@@ -35,6 +35,7 @@
     "dist/",
     "examples/",
     "README.md",
+    "README.en.md",
     "README.zh.md",
     "LICENSE"
   ],
