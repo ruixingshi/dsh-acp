@@ -1,85 +1,43 @@
 import { describe, expect, it } from 'vitest'
-import { projectRuntimeEvent } from '../src/projector.js'
+import { planUpdate, titleUpdate, toolKind } from '../src/projector.js'
 
-describe('Harness event projection', () => {
-  it('projects assistant text and reasoning with stable message ids', () => {
-    expect(projectRuntimeEvent({ type: 'assistant-text', text: 'hello', messageId: 'm1' })).toEqual(
-      {
-        sessionUpdate: 'agent_message_chunk',
-        messageId: 'm1',
-        content: { type: 'text', text: 'hello' },
-      },
-    )
+describe('Harness presentation mappings', () => {
+  it('preserves task status and clears a previous plan for a new turn', () => {
     expect(
-      projectRuntimeEvent({ type: 'assistant-thought', text: 'checking', messageId: 'r1' }),
-    ).toEqual({
-      sessionUpdate: 'agent_thought_chunk',
-      messageId: 'r1',
-      content: { type: 'text', text: 'checking' },
-    })
-  })
-
-  it('creates a classified tool card and retains malformed raw arguments', () => {
-    expect(
-      projectRuntimeEvent({
-        type: 'tool-call',
-        callId: 'call-1',
-        name: 'read_file',
-        arguments: '{bad json',
-      }),
-    ).toEqual({
-      sessionUpdate: 'tool_call',
-      toolCallId: 'call-1',
-      name: 'read_file',
-      title: 'read_file',
-      kind: 'read',
-      status: 'in_progress',
-      rawInput: '{bad json',
-    })
-  })
-
-  it('completes failed tools with model-visible content', () => {
-    expect(
-      projectRuntimeEvent({
-        type: 'tool-result',
-        callId: 'call-1',
-        isError: true,
-        content: [{ type: 'text', text: 'permission denied' }],
-      }),
-    ).toEqual({
-      sessionUpdate: 'tool_call_update',
-      toolCallId: 'call-1',
-      status: 'failed',
-      content: [
-        {
-          type: 'content',
-          content: { type: 'text', text: 'permission denied' },
-        },
-      ],
-      rawOutput: 'permission denied',
-    })
-  })
-
-  it('projects whole-list plans and context usage', () => {
-    expect(
-      projectRuntimeEvent({
-        type: 'plan',
-        entries: [
-          { content: 'Inspect code', status: 'completed' },
-          { content: 'Implement adapter', status: 'in_progress' },
-        ],
-      }),
+      planUpdate([
+        { content: 'Inspect', status: 'in_progress' },
+        { content: 'Ship', status: 'pending' },
+      ]),
     ).toEqual({
       sessionUpdate: 'plan',
       entries: [
-        { content: 'Inspect code', status: 'completed', priority: 'medium' },
-        { content: 'Implement adapter', status: 'in_progress', priority: 'medium' },
+        { content: 'Inspect', status: 'in_progress', priority: 'medium' },
+        { content: 'Ship', status: 'pending', priority: 'medium' },
       ],
     })
-    expect(projectRuntimeEvent({ type: 'usage', used: 2048, size: 128_000 })).toEqual({
-      sessionUpdate: 'usage_update',
-      used: 2048,
-      size: 128_000,
+    expect(planUpdate(null)).toEqual({ sessionUpdate: 'plan', entries: [] })
+  })
+  it('forwards accepted titles and leaves untitled sessions alone', () => {
+    expect(titleUpdate('修复登录问题')).toEqual({
+      sessionUpdate: 'session_info_update',
+      title: '修复登录问题',
     })
+    expect(titleUpdate(null)).toBeUndefined()
+    expect(titleUpdate(undefined)).toBeUndefined()
+  })
+  it.each([
+    ['read_file', 'read'],
+    ['write_file', 'edit'],
+    ['apply_patch', 'edit'],
+    ['delete_file', 'delete'],
+    ['rename_file', 'move'],
+    ['web_search', 'search'],
+    ['bash', 'execute'],
+    ['web_fetch', 'fetch'],
+    ['todo_write', 'think'],
+    ['mcp__external__read_file', 'other'],
+    ['custom_tool', 'other'],
+  ])('classifies %s as %s', (name, kind) => {
+    expect(toolKind(name)).toBe(kind)
   })
 })

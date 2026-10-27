@@ -1,13 +1,8 @@
 #!/usr/bin/env node
-/** Boot the official Harness ACP profile or the legacy rich adapter. */
-
-import { boot, installFailLoud, loadEnv, resolveConfigPath } from '@deepseek-ai/dsh-app-boot'
-import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+/** Launch the official Harness ACP profile with the bundled presentation plugin. */
+import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { VERSION } from './version.js'
-
-const NAME = 'dsh-acp'
 
 const { values } = parseArgs({
   args: process.argv.slice(2),
@@ -19,7 +14,6 @@ const { values } = parseArgs({
   },
   strict: true,
 })
-
 if (values.version === true) {
   process.stdout.write(`${VERSION}\n`)
   process.exit(0)
@@ -32,16 +26,13 @@ Usage:
   npx --yes @dumbo-ai/dsh-acp [options]
 
 Options:
-      --patch <path>   Patch the official DeepSeek Harness ACP profile; repeatable
-  -c, --config <path>  Boot a legacy complete Cordis configuration
+      --patch <path>   Customize the Harness profile; repeatable
   -h, --help           Show this help
   -v, --version        Show the package version
 
 Default runtime:
-  DeepSeek Harness official ACP profile
-
-Legacy configuration precedence:
-  --config, then ./cordis.yml; --patch cannot be combined with legacy mode
+  DeepSeek Harness official ACP profile with plans, titles and tool categories
+  Custom model settings target the dsh-acp entry in a --patch overlay.
 
 Environment:
   DEEPSEEK_API_KEY      DeepSeek API key
@@ -51,36 +42,20 @@ Environment:
 `)
   process.exit(0)
 }
-
-const localConfig = resolve(process.cwd(), 'cordis.yml')
-const configPath =
-  values.config === undefined
-    ? existsSync(localConfig)
-      ? localConfig
-      : undefined
-    : resolveConfigPath(values.config, undefined)
-const patches = values.patch ?? []
-
-if (configPath !== undefined && patches.length > 0) {
-  process.stderr.write(`${NAME}: --patch cannot be combined with --config or ./cordis.yml\n`)
+if (values.config !== undefined) {
+  process.stderr.write(
+    'dsh-acp: --config has been removed. Use --patch with a profile overlay (id: dsh-acp); complete cordis.yml files are no longer loaded.\n',
+  )
   process.exit(1)
 }
-
-if (configPath === undefined) {
-  process.argv = [
-    process.execPath,
-    NAME,
-    '--profile',
-    'acp',
-    ...patches.flatMap((path) => ['--patch', path]),
-  ]
-  const { runCli } = await import('@deepseek-ai/dsh/lib/bin.js')
-  await runCli()
-} else {
-  installFailLoud(NAME)
-  loadEnv(NAME)
-  const ctx = await boot(NAME, configPath)
-  process.stdin.once('end', () => {
-    void ctx.fiber.dispose().then(() => process.exit(0))
-  })
-}
+process.argv = [
+  process.execPath,
+  'dsh-acp',
+  '--profile',
+  'acp',
+  '--patch',
+  fileURLToPath(new URL('../assets/acp.patch.yml', import.meta.url)),
+  ...(values.patch ?? []).flatMap((path) => ['--patch', path]),
+]
+const { runCli } = await import('@deepseek-ai/dsh/lib/bin.js')
+await runCli()

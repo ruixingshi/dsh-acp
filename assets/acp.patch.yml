@@ -1,0 +1,10 @@
+# Use one official ACP server, decorated with standard presentation updates.
+- id: acp
+  disabled: true
+- insert:
+    - id: dsh-acp
+      name: '../dist/plugin.js'
+      inject: [acpAppStartup]
+      config:
+        provider: deepseek-official
+        model: deepseek-v4-flash

@@ -1,91 +1,34 @@
 # DeepSeek Harness ACP
 
-`@dumbo-ai/dsh-acp` connects ACP clients such as Dumbo and Zed to DeepSeek Harness. Version **0.5.0** uses Harness **`0.2.1-rc.4`** with a bundled default configuration. Users do not need to create a `cordis.yml`.
+`@dumbo-ai/dsh-acp` connects Dumbo, Zed, and other ACP clients to DeepSeek Harness. Installing this package also installs Harness; users do not need to install `dsh` separately or prepare a `cordis.yml`.
 
-[中文文档](README.md)
+[中文](README.md)
+
+Version **0.6.0** uses Harness **0.2.1-rc.4**. Official ACP owns session execution; plans, titles, and tool categories are enabled by default.
 
 ## Quick start
 
-Requires Node.js **`>=24.9.0`**. Install globally first:
+Requires Node.js **>=24.9.0**:
 
 ```bash
-npm install -g @dumbo-ai/dsh-acp@0.5.0
+npm install -g @dumbo-ai/dsh-acp@0.6.0
 dsh-acp --version
 ```
 
-Set the client's command to `dsh-acp`, leave arguments empty, and configure `DEEPSEEK_API_KEY`. Each launch uses the installed package without waiting for an `npx` download. Run the same installation command to upgrade, then restart the client.
+Configure your client to run `dsh-acp` with no arguments and set `DEEPSEEK_API_KEY`. Restart the client after upgrading. For temporary use, run `npx --yes @dumbo-ai/dsh-acp@0.6.0`.
 
-For a temporary run, use `npx --yes @dumbo-ai/dsh-acp@0.5.0`. The default command starts the official ACP profile, whose tools, models, and session lifecycle are maintained by Harness.
+| Environment variable  | Purpose                                                                                                  |
+| --------------------- | -------------------------------------------------------------------------------------------------------- |
+| `DEEPSEEK_API_KEY`    | DeepSeek API key                                                                                         |
+| `DEEPSEEK_BASE_URL`   | Optional compatible endpoint; omit for the official service, or use `https://api.deepseek.com/anthropic` |
+| `DSH_HOME`            | Optional Harness settings, credentials, and session directory                                            |
+| `DSH_PERMISSION_MODE` | Optional permission preset: `read-only`, `workspace-write`, or `danger-full-access`                      |
 
-The launcher recognizes these environment variables:
+Custom base URLs pass through unchanged. The old official API root is not compatible with the default Messages route.
 
-- `DEEPSEEK_API_KEY`: DeepSeek API key.
-- `DEEPSEEK_BASE_URL`: optional DeepSeek-compatible endpoint inherited by the Harness process. Custom endpoints are preserved. For the official DeepSeek service, omit this variable or use `https://api.deepseek.com/anthropic`; the old API-root override is no longer appropriate for the default Messages route.
-- `DSH_HOME`: optional Harness state, settings, credentials, sessions, and profile directory.
-- `DSH_PERMISSION_MODE`: optional Harness permission preset such as `read-only`, `workspace-write`, or `danger-full-access`.
+## Client configuration
 
-Harness also supports its managed settings and credential files under `DSH_HOME`.
-
-## Customize the official profile
-
-Pass one or more patch-list overlays with `--patch`. Later patches win. The repository includes [examples/acp.patch.yml](examples/acp.patch.yml):
-
-```yaml
-- id: acp
-  config:
-    provider: deepseek-official
-    model: deepseek-v4-pro
-```
-
-Start with that patch:
-
-```bash
-dsh-acp --patch /absolute/path/to/acp.patch.yml
-```
-
-A patch replaces the targeted row's complete `config`, so include every field that row needs.
-
-## Legacy complete-Cordis mode
-
-For compatibility, an explicit `--config` starts the package's original rich adapter inside a complete Cordis tree:
-
-```bash
-dsh-acp --config /absolute/path/to/cordis.yml
-```
-
-A `cordis.yml` in the launch directory selects the same legacy mode automatically. `--patch` cannot be combined with either legacy path. A legacy file must define the whole Harness composition; it is not an overlay for the official profile.
-
-The adapter's Cordis entry is:
-
-```yaml
-- id: rich-acp
-  name: '@dumbo-ai/dsh-acp'
-  config:
-    provider: deepseek-official
-    model: deepseek-v4-pro
-    reasoningEffort: max
-```
-
-The CLI reserves stdout for ACP JSON-RPC frames and sends diagnostics to stderr.
-
-## ACP coverage in the default mode
-
-The default official profile supports:
-
-- ACP v1 initialization, with API keys supplied through environment variables or Harness credentials.
-- Creating, listing, resuming, prompting, cancelling, and closing persistent sessions.
-- Standard model and reasoning-effort configuration options.
-- Ordered text and resource links, plus supported raster images when the selected model route accepts images.
-- Standard stdio and Streamable HTTP MCP server declarations, MCP protocol negotiation and paginated tool discovery, including servers that expose no tools.
-- Shared MCP resource discovery, direct reads, and URI-template completion supplied by the Harness profile.
-- Committed message and thought updates, generic tool lifecycle, configuration changes, context usage, and permission requests.
-- Prompt and close settlement only after the Harness Agent and ordered update stream become quiescent.
-
-It does not support session load, deletion or fork, additional directories, audio, embedded context, ACP modes or commands, plans, terminals, client filesystem operations, or elicitation. Unsupported capabilities are omitted or rejected according to ACP.
-
-## Dumbo
-
-After installing globally, add this entry to `acp_agent_servers` in the local `acp-agent-config.json`:
+Add this entry to Dumbo's `acp-agent-config.json`, preserving other agents:
 
 ```json
 {
@@ -94,63 +37,76 @@ After installing globally, add this entry to `acp_agent_servers` in the local `a
       "type": "custom",
       "command": "dsh-acp",
       "args": [],
-      "env": {
-        "DEEPSEEK_API_KEY": "your API key"
-      }
+      "env": { "DEEPSEEK_API_KEY": "your API key" }
     }
   }
 }
 ```
 
-Keep other agents in the file. If the client cannot find the command, run `command -v dsh-acp` and use the returned absolute path as `command`. Recruit the agent again after changing its launch configuration. Later package upgrades keep the same executable path; restart the client to use them.
+If the client cannot find the command, use the absolute path returned by `command -v dsh-acp`. Recruit the agent after adding its configuration. Zed uses the same command under `agent_servers`; see [External Agents](https://zed.dev/docs/ai/external-agents).
 
-## Zed
+## Default presentation
 
-Add a custom External Agent:
+- Model/reasoning selection and permission requests from official ACP.
+- Task lists and progress when the agent uses Harness todos; the next turn clears the preceding plan.
+- Harness session titles. The default derives a short title from the first prompt without an extra model request. Updates from custom title providers also propagate.
+- Read, edit, search, execute, and other tool categories. Unknown and MCP tools remain generic; explicit official classifications take precedence.
+- Existing title and current todo state after session resume, plus saved titles in the history list.
 
-```json
-{
-  "agent_servers": {
-    "dsh-acp": {
-      "type": "custom",
-      "command": "dsh-acp",
-      "args": [],
-      "env": {
-        "DEEPSEEK_API_KEY": "..."
-      }
-    }
-  }
-}
+Task lists are not Codex Plan mode. Harness and the model decide when to use them, and the client must render the corresponding ACP update types.
+
+## Custom configuration
+
+For a custom default model, supply an overlay such as [examples/acp.patch.yml](examples/acp.patch.yml):
+
+```yaml
+- id: dsh-acp
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-pro
 ```
 
-Add `"--patch", "/absolute/path/to/acp.patch.yml"` to `args` when needed. See the current [Zed External Agents documentation](https://zed.dev/docs/ai/external-agents).
+```bash
+dsh-acp --patch /absolute/path/to/acp.patch.yml
+```
 
-## Library API
+Repeat `--patch` for additional overlays. Later overlays win; a `config` patch replaces the complete configuration of its target entry.
 
-The package continues to export `DshAcpServer`, `DshAcpAgent`, `CordisHarnessRuntime`, the protocol-neutral `HarnessRuntime` and `RuntimeSession` interfaces, and the Cordis `apply`/`Config` plugin entry points. These exports implement the retained compatibility adapter; the zero-argument CLI uses the official Harness ACP implementation.
+## Migration from 0.5.x and earlier
+
+Users launching with no arguments can upgrade and restart their client.
+
+- Remove `--config`; complete Cordis configurations are no longer loaded. A working-directory `cordis.yml` is ignored.
+- Move required settings into `--patch` overlays. Change ACP model-setting targets from `id: acp` to `id: dsh-acp`; other Harness plugin ids are unchanged.
+- Do not re-enable the original `acp` entry. The bundled overlay replaces it with the presentation plugin that calls the same official implementation.
+- The previous `DshAcpServer`, `DshAcpAgent`, `CordisHarnessRuntime`, `HarnessRuntime`, and `./runtime` exports are removed. Use the Cordis plugin below for programmatic integration.
+
+## ACP capabilities
+
+Official ACP owns session creation/list/resume/cancel/close, persistence, model settings, usage, permissions, and MCP mounts. Text and resource links are supported; images depend on the model and Harness configuration. Messages and thoughts are sent after commitment, not as token deltas. Stdout contains JSON-RPC only; diagnostics go to stderr.
+
+The protocol remains ACP v1. Transcript replay (`session/load`), fork/delete, additional directories, audio, embedded context, ACP modes/commands, terminal views, client filesystem operations, and elicitation remain unsupported. Resume restores model context and presentation state without replaying historical messages. Official ACP owns list filtering, ordering, and pagination; we only add cached titles. Rows without an available title checkpoint remain untitled.
+
+## Programmatic integration
+
+The package root and `@dumbo-ai/dsh-acp/plugin` export the official-backed Cordis plugin:
 
 ```ts
-import { DshAcpServer, type HarnessRuntime } from '@dumbo-ai/dsh-acp'
+import * as acp from '@dumbo-ai/dsh-acp/plugin'
 
-const runtime: HarnessRuntime = createRuntime()
-const server = new DshAcpServer(runtime, {
-  initialSelection: { provider: 'my-provider', model: 'my-model' },
-})
-
-server.connect(stream)
+ctx.plugin(acp, { provider: 'deepseek-official', model: 'deepseek-v4-pro' })
 ```
 
-The implementation targets [`@agentclientprotocol/sdk` 1.4](https://github.com/agentclientprotocol/typescript-sdk). Architecture and rationale are recorded in the [design](https://github.com/ruixingshi/dsh-acp/blob/main/docs/plans/2026-08-17-acp-adapter-design.md) and [ADR 0001](https://github.com/ruixingshi/dsh-acp/blob/main/docs/adr/0001-protocol-runtime-separation.md).
+The context must already provide official ACP's Harness services plus `sessionProjections` and `sessionProjectionCache`. Presentation uses the registered `title` and `todos` projections. Configuration follows official `provider`, `model`, and `sessionListPageSize`, with an optional runtime ACP `stream`. Do not mount a second ACP server.
 
 ## Development
 
 ```bash
 pnpm install --registry=https://registry.npmjs.org/
 pnpm check
-npx --yes . --help
 ```
 
-The protocol and Harness integration suites run without an API key.
+Tests use a deterministic model substitute with real Harness, tools, MCP, and persistence. No API key is required. See [ADR 0002](docs/adr/0002-official-acp-presentation.md).
 
 ## License
 

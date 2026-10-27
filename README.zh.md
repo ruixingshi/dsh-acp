@@ -1,89 +1,34 @@
 # DeepSeek Harness ACP
 
-`@dumbo-ai/dsh-acp` 让 Dumbo、Zed 等 ACP 客户端使用 DeepSeek Harness。当前版本 **0.5.0** 使用 Harness **`0.2.1-rc.4`**，默认配置随包提供，不需要自己准备 `cordis.yml`。
+`@dumbo-ai/dsh-acp` 让 Dumbo、Zed 等 ACP 客户端使用 DeepSeek Harness。安装本包会自动安装 Harness，不需要单独安装 `dsh`，也不需要准备 `cordis.yml`。
+
+[English](README.en.md)
+
+本文对应 **0.6.0**，依赖 Harness **0.2.1-rc.4**。会话运行使用官方 ACP，默认增加计划进度、会话标题和工具分类。
 
 ## 快速开始
 
-需要 Node.js **`>=24.9.0`**。先全局安装：
+需要 Node.js **>=24.9.0**。全局安装后，客户端可以直接启动，无需每次等待下载：
 
 ```bash
-npm install -g @dumbo-ai/dsh-acp@0.5.0
+npm install -g @dumbo-ai/dsh-acp@0.6.0
 dsh-acp --version
 ```
 
-客户端启动命令填写 `dsh-acp`，参数留空，再配置 `DEEPSEEK_API_KEY`。这样每次启动直接使用已安装的包，不用等待 `npx` 下载。升级也执行上面的安装命令，完成后重启客户端。
+在客户端填写启动命令 `dsh-acp`，参数留空，并配置 `DEEPSEEK_API_KEY`。升级后重启客户端即可。临时体验也可以运行 `npx --yes @dumbo-ai/dsh-acp@0.6.0`。
 
-如果只想临时运行，也可以使用 `npx --yes @dumbo-ai/dsh-acp@0.5.0`。无参数启动使用官方 ACP profile，工具、模型和会话能力由 Harness 提供。
+| 环境变量              | 用途                                                                                            |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| `DEEPSEEK_API_KEY`    | DeepSeek API Key                                                                                |
+| `DEEPSEEK_BASE_URL`   | 可选，自定义 DeepSeek 兼容接口地址；官方服务可不填，或使用 `https://api.deepseek.com/anthropic` |
+| `DSH_HOME`            | 可选，Harness 的设置、凭据和会话目录                                                            |
+| `DSH_PERMISSION_MODE` | 可选，权限预设，如 `read-only`、`workspace-write` 或 `danger-full-access`                       |
 
-启动器识别以下环境变量：
+自定义 Base URL 会保持原样。使用官方服务时，旧的 API 根地址不适用于默认的 Messages 路由。
 
-- `DEEPSEEK_API_KEY`：DeepSeek API Key。
-- `DEEPSEEK_BASE_URL`：可选，传给 Harness 进程的 DeepSeek 兼容接口地址。自定义接口地址保持原样；使用 DeepSeek 官方服务时应删除该变量，或填写 `https://api.deepseek.com/anthropic`，旧的 API 根地址不再适用于默认 Messages 路由。
-- `DSH_HOME`：可选，Harness 的状态、设置、凭据、会话和 profile 目录。
-- `DSH_PERMISSION_MODE`：可选，Harness 权限预设，例如 `read-only`、`workspace-write` 或 `danger-full-access`。
+## Dumbo / 飞象配置
 
-Harness 也会使用 `DSH_HOME` 下由它管理的设置和凭据文件。
-
-## 自定义官方 profile
-
-使用 `--patch` 传入一个或多个 patch-list overlay，后面的 patch 优先。仓库提供了 [examples/acp.patch.yml](examples/acp.patch.yml)：
-
-```yaml
-- id: acp
-  config:
-    provider: deepseek-official
-    model: deepseek-v4-pro
-```
-
-启动命令：
-
-```bash
-dsh-acp --patch /absolute/path/to/acp.patch.yml
-```
-
-patch 会替换目标条目的整个 `config`，所以目标条目需要的字段都应写全。
-
-## 旧版完整 Cordis 模式
-
-为保持兼容，显式传入 `--config` 时，仍会在一棵完整 Cordis 配置树中启动本包原来的 rich adapter：
-
-```bash
-dsh-acp --config /absolute/path/to/cordis.yml
-```
-
-如果启动目录存在 `./cordis.yml`，也会自动进入这个旧版模式。`--patch` 不能和这两种旧版入口同时使用。旧版 `cordis.yml` 必须描述完整的 Harness 组合，它不是官方 profile 的 overlay。
-
-适配器对应的 Cordis 条目是：
-
-```yaml
-- id: rich-acp
-  name: '@dumbo-ai/dsh-acp'
-  config:
-    provider: deepseek-official
-    model: deepseek-v4-pro
-    reasoningEffort: max
-```
-
-CLI 会把 stdout 专门留给 ACP JSON-RPC 帧，诊断信息写入 stderr。
-
-## 默认模式的 ACP 支持范围
-
-默认官方 profile 支持：
-
-- ACP v1 初始化，API Key 通过环境变量或 Harness 凭据配置提供。
-- 创建、列出、恢复、提示、取消和关闭持久会话。
-- 标准模型与推理强度配置项。
-- 有序文本和 resource link；当选中模型支持图片时，也支持相应的栅格图片输入。
-- 标准 stdio 和 Streamable HTTP MCP server 配置、MCP 协议协商与分页工具发现，也支持没有暴露工具的 server。
-- Harness profile 提供的共享 MCP resource 发现、直接读取与 URI 模板补全。
-- 已提交的消息与思考、通用工具生命周期、配置变化、上下文用量和权限请求。
-- 只有在 Harness Agent 和有序更新流完全停稳后，prompt 和 close 才会结束。
-
-当前不支持 session load、删除或 fork、additional directories、音频、embedded context、ACP mode 或 command、plan、terminal、客户端文件操作和 elicitation。未支持的能力会按 ACP 要求不声明或明确拒绝。
-
-## Dumbo / 飞象
-
-全局安装后，在本地 `acp-agent-config.json` 的 `acp_agent_servers` 中添加：
+在本地 `acp-agent-config.json` 的 `acp_agent_servers` 中添加以下条目，保留其他 Agent：
 
 ```json
 {
@@ -100,55 +45,72 @@ CLI 会把 stdout 专门留给 ACP JSON-RPC 帧，诊断信息写入 stderr。
 }
 ```
 
-保留文件中的其他 Agent。若客户端找不到命令，执行 `command -v dsh-acp`，把输出的绝对路径填入 `command`。首次修改配置后重新招募该 Agent；以后仅升级包时，启动路径不变，重启客户端即可。
+如果客户端找不到命令，运行 `command -v dsh-acp`，把输出的绝对路径填入 `command`。首次添加配置后招募该 Agent。
 
-## Zed
+Zed 使用同样的启动命令，在其 `agent_servers` 中配置；详见 [External Agents 文档](https://zed.dev/docs/ai/external-agents)。
 
-添加一个自定义 External Agent：
+## 默认能看到什么
 
-```json
-{
-  "agent_servers": {
-    "dsh-acp": {
-      "type": "custom",
-      "command": "dsh-acp",
-      "args": [],
-      "env": {
-        "DEEPSEEK_API_KEY": "..."
-      }
-    }
-  }
-}
+- 模型和思考强度选择，以及权限确认。
+- Agent 使用任务清单时，显示计划及完成进度；下一轮开始时清除上一轮清单。
+- 使用 Harness 已有的会话标题。默认从首条消息截取简短标题，不额外调用模型；自定义标题插件生成的新标题也会同步。
+- 区分读取、编辑、搜索、执行命令等工具。未知工具和 MCP 工具保留通用分类，官方明确提供的分类优先。
+- 恢复会话时同步已有标题和当前清单；历史会话列表也显示已保存的标题。
+
+计划清单不是 Codex 的 Plan 模式；是否生成清单由 Harness 和模型决定。客户端需要支持对应 ACP 展示类型。
+
+## 自定义模型或其他 Harness 配置
+
+普通使用不需要配置文件。如需指定默认模型，创建一个补丁文件：
+
+```yaml
+- id: dsh-acp
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-pro
 ```
 
-需要自定义时，在 `args` 中追加 `"--patch", "/absolute/path/to/acp.patch.yml"`。当前配置格式见 [Zed External Agents 文档](https://zed.dev/docs/ai/external-agents)。
+```bash
+dsh-acp --patch /absolute/path/to/acp.patch.yml
+```
 
-## 程序化使用
+`--patch` 可重复传入，后面的补丁优先。补丁替换目标条目的整个 `config`，所需字段应写全。示例见 [examples/acp.patch.yml](examples/acp.patch.yml)。
 
-包仍然导出 `DshAcpServer`、`DshAcpAgent`、`CordisHarnessRuntime`、协议无关的 `HarnessRuntime` / `RuntimeSession` 接口，以及 Cordis 的 `apply` / `Config` 插件入口。这些导出属于保留的兼容适配器；无参数 CLI 使用的是 Harness 官方 ACP 实现。
+## 从 0.5.x 及更早版本升级
+
+无参数启动的用户直接升级并重启客户端。
+
+- 移除启动参数中的 `--config`，旧的完整 `cordis.yml` 不再加载；工作目录中的同名文件也不再自动生效。
+- 需要自定义的设置改为上述 `--patch`。原来修改 ACP 模型的补丁，把目标 `id: acp` 改成 `id: dsh-acp`。其他 Harness 插件的条目 ID 不变。
+- 不要在补丁中重新启用官方 `acp` 条目，它已由内置补丁替换为调用同一官方实现的增强入口。
+- 移除了旧的 `DshAcpServer`、`DshAcpAgent`、`CordisHarnessRuntime`、`HarnessRuntime` 以及 `./runtime` 导出。程序化接入使用下述 Cordis 插件。
+
+## 协议能力与限制
+
+会话创建、列表、恢复、取消、关闭、持久化、模型设置、上下文用量、权限确认和 MCP 挂载由官方 ACP 负责。支持文本和 resource link；图片取决于模型和 Harness 配置。消息和思考在提交后发送，不逐 token 输出。stdout 只包含 ACP JSON-RPC，诊断写入 stderr。
+
+当前使用 ACP v1。暂不提供历史消息重放（`session/load`）、会话分叉或删除、额外工作目录、音频、embedded context、ACP mode/command、终端视图、客户端文件操作或结构化提问。恢复会话会恢复模型上下文和展示状态，但不会重放历史消息；列表的筛选、排序和分页由官方负责，我们只补充标题；没有可用标题缓存的条目保持无标题。
+
+## 程序化接入
+
+根入口和 `@dumbo-ai/dsh-acp/plugin` 都导出官方实现支持的 Cordis 插件：
 
 ```ts
-import { DshAcpServer, type HarnessRuntime } from '@dumbo-ai/dsh-acp'
+import * as acp from '@dumbo-ai/dsh-acp/plugin'
 
-const runtime: HarnessRuntime = createRuntime()
-const server = new DshAcpServer(runtime, {
-  initialSelection: { provider: 'my-provider', model: 'my-model' },
-})
-
-server.connect(stream)
+ctx.plugin(acp, { provider: 'deepseek-official', model: 'deepseek-v4-pro' })
 ```
 
-当前实现使用 [`@agentclientprotocol/sdk` 1.4](https://github.com/agentclientprotocol/typescript-sdk)。架构与设计理由记录在[设计文档](https://github.com/ruixingshi/dsh-acp/blob/main/docs/plans/2026-08-17-acp-adapter-design.md)和 [ADR 0001](https://github.com/ruixingshi/dsh-acp/blob/main/docs/adr/0001-protocol-runtime-separation.md) 中。
+`ctx` 必须已经组合好官方 ACP 所需的 Harness 服务，以及 `sessionProjections` 和 `sessionProjectionCache`。标题和计划使用 Harness 注册的 `title`、`todos` 投影。配置沿用官方的 `provider`、`model` 和 `sessionListPageSize`，运行时还可传入 ACP `stream`。不要同时挂载另一个 ACP 服务器。
 
 ## 本地开发
 
 ```bash
 pnpm install --registry=https://registry.npmjs.org/
 pnpm check
-npx --yes . --help
 ```
 
-协议与 Harness 集成测试不需要 API Key。
+测试使用确定性的模型替身，实际启动官方 Harness、工具、MCP 和持久化，不需要 API Key。架构见 [ADR 0002](docs/adr/0002-official-acp-presentation.md)。
 
 ## License
 

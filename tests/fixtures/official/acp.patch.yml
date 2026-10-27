@@ -1,10 +1,11 @@
 # Use the shipped ACP profile with a deterministic model and isolated persistence.
 - id: llm-deepseek
   disabled: true
-- id: acp
+- id: dsh-acp
   config:
     provider: fixture
     model: alpha
+    sessionListPageSize: 1
 - id: session-persistence-jsonl
   config:
     root: !!js process.env.DSH_ACP_TEST_SESSIONS

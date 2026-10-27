@@ -19,7 +19,7 @@ function isDshPackage(name: string): boolean {
 }
 
 describe('published manifest', () => {
-  it('reports the package manifest version on every protocol surface', () => {
+  it('reports the package manifest version through the launcher', () => {
     const root = readManifest(join(process.cwd(), 'package.json'))
     expect(root.version).toBe(VERSION)
   })

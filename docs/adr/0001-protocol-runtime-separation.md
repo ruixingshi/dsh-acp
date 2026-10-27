@@ -1,5 +1,7 @@
 # ADR 0001: Separate ACP protocol handling from the Harness runtime adapter
 
+Superseded by [ADR 0002](0002-official-acp-presentation.md) in 0.6.0. This document describes the removed independent adapter.
+
 - Status: Accepted
 - Date: 2026-08-17
 

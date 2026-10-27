@@ -1,2 +1,2 @@
-/** Package version exposed through the ACP initialize response. */
-export const VERSION = '0.5.0'
+/** Package version reported by the launcher. */
+export const VERSION = '0.6.0'

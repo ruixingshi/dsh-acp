@@ -1,6 +1,18 @@
 /** Deterministic provider; all ACP, Agent, tool and persistence code remains real. */
 import { LlmAdapter, ReasoningEffortId, ToolCallId } from '@deepseek-ai/dsh-llm'
 
+function* callTool(id, name, args) {
+  const argumentsText = JSON.stringify(args)
+  yield { type: 'block-start', index: 0, blockType: 'tool-call' }
+  yield { type: 'tool-call-delta', index: 0, id, name, argumentsDelta: argumentsText }
+  yield {
+    type: 'block-end',
+    index: 0,
+    block: { type: 'tool-call', id, name, arguments: argumentsText },
+  }
+  yield { type: 'finish', reason: { kind: 'tool-calls' } }
+}
+
 class FixtureAdapter extends LlmAdapter {
   providerInfo() {
     return { id: 'fixture', name: 'Fixture' }
@@ -39,6 +51,42 @@ class FixtureAdapter extends LlmAdapter {
       .map((block) => block.text)
       .join('')
     if (prompt === 'fail') throw new Error('fixture provider failure')
+    if (prompt.startsWith('plan')) {
+      const completed = turn.filter((message) => message.role === 'tool').length
+      if (completed === 0) {
+        yield* callTool(ToolCallId('plan-start'), 'todo_write', {
+          todos: [
+            { content: 'Read fixture', status: 'in_progress' },
+            { content: 'Report result', status: 'pending' },
+          ],
+        })
+        return
+      }
+      if (completed === 1) {
+        yield* callTool(ToolCallId('plan-read'), 'read', {
+          file_path: process.env.DSH_ACP_TEST_FILE,
+        })
+        return
+      }
+      if (completed === 2) {
+        yield* callTool(ToolCallId('plan-finish'), 'todo_write', {
+          todos: [
+            { content: 'Read fixture', status: 'completed' },
+            { content: 'Report result', status: 'completed' },
+          ],
+        })
+        return
+      }
+      const readResult = turn.find(
+        (message) => message.role === 'tool' && message.toolCallId === 'plan-read',
+      )
+      const text = `planned: ${JSON.stringify(readResult.content)}`
+      yield { type: 'block-start', index: 0, blockType: 'text' }
+      yield { type: 'text-delta', index: 0, text }
+      yield { type: 'block-end', index: 0, block: { type: 'text', text } }
+      yield { type: 'finish', reason: { kind: 'stop' } }
+      return
+    }
     const tool = turn.find((message) => message.role === 'tool')
     if (!tool) {
       const id = ToolCallId(`fixture-${prompt}`)
