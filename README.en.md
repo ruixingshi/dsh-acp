@@ -1,19 +1,21 @@
 # DeepSeek Harness ACP
 
-`@dumbo-ai/dsh-acp` provides a stable `npx` entry point for the official DeepSeek Harness ACP application. Version 0.4.1 uses DeepSeek Harness `0.1.6-alpha.1` and its maintained `acp` profile by default, while retaining the package's earlier TypeScript adapter API and complete-Cordis configuration mode for existing integrations.
+`@dumbo-ai/dsh-acp` connects ACP clients such as Dumbo and Zed to DeepSeek Harness. Version **0.5.0** uses Harness **`0.2.1-rc.4`** with a bundled default configuration. Users do not need to create a `cordis.yml`.
 
 [中文文档](README.md)
 
 ## Quick start
 
-Requires Node.js `^22.19.0` or `>=24.0.0`.
+Requires Node.js **`>=24.9.0`**. Install globally first:
 
 ```bash
-export DEEPSEEK_API_KEY='...'
-npx --yes @dumbo-ai/dsh-acp
+npm install -g @dumbo-ai/dsh-acp@0.5.0
+dsh-acp --version
 ```
 
-The default command starts the official DeepSeek Harness ACP profile. That profile owns the coding tools, sandbox and permission policy, model catalog, persistent sessions, MCP integration, and ACP lifecycle.
+Set the client's command to `dsh-acp`, leave arguments empty, and configure `DEEPSEEK_API_KEY`. Each launch uses the installed package without waiting for an `npx` download. Run the same installation command to upgrade, then restart the client.
+
+For a temporary run, use `npx --yes @dumbo-ai/dsh-acp@0.5.0`. The default command starts the official ACP profile, whose tools, models, and session lifecycle are maintained by Harness.
 
 The launcher recognizes these environment variables:
 
@@ -38,7 +40,7 @@ Pass one or more patch-list overlays with `--patch`. Later patches win. The repo
 Start with that patch:
 
 ```bash
-npx --yes @dumbo-ai/dsh-acp --patch /absolute/path/to/acp.patch.yml
+dsh-acp --patch /absolute/path/to/acp.patch.yml
 ```
 
 A patch replaces the targeted row's complete `config`, so include every field that row needs.
@@ -48,7 +50,7 @@ A patch replaces the targeted row's complete `config`, so include every field th
 For compatibility, an explicit `--config` starts the package's original rich adapter inside a complete Cordis tree:
 
 ```bash
-npx --yes @dumbo-ai/dsh-acp --config /absolute/path/to/cordis.yml
+dsh-acp --config /absolute/path/to/cordis.yml
 ```
 
 A `cordis.yml` in the launch directory selects the same legacy mode automatically. `--patch` cannot be combined with either legacy path. A legacy file must define the whole Harness composition; it is not an overlay for the official profile.
@@ -70,7 +72,7 @@ The CLI reserves stdout for ACP JSON-RPC frames and sends diagnostics to stderr.
 
 The default official profile supports:
 
-- ACP v1 initialization and authentication.
+- ACP v1 initialization, with API keys supplied through environment variables or Harness credentials.
 - Creating, listing, resuming, prompting, cancelling, and closing persistent sessions.
 - Standard model and reasoning-effort configuration options.
 - Ordered text and resource links, plus supported raster images when the selected model route accepts images.
@@ -81,6 +83,27 @@ The default official profile supports:
 
 It does not support session load, deletion or fork, additional directories, audio, embedded context, ACP modes or commands, plans, terminals, client filesystem operations, or elicitation. Unsupported capabilities are omitted or rejected according to ACP.
 
+## Dumbo
+
+After installing globally, add this entry to `acp_agent_servers` in the local `acp-agent-config.json`:
+
+```json
+{
+  "acp_agent_servers": {
+    "dsh": {
+      "type": "custom",
+      "command": "dsh-acp",
+      "args": [],
+      "env": {
+        "DEEPSEEK_API_KEY": "your API key"
+      }
+    }
+  }
+}
+```
+
+Keep other agents in the file. If the client cannot find the command, run `command -v dsh-acp` and use the returned absolute path as `command`. Recruit the agent again after changing its launch configuration. Later package upgrades keep the same executable path; restart the client to use them.
+
 ## Zed
 
 Add a custom External Agent:
@@ -90,8 +113,8 @@ Add a custom External Agent:
   "agent_servers": {
     "dsh-acp": {
       "type": "custom",
-      "command": "npx",
-      "args": ["--yes", "@dumbo-ai/dsh-acp"],
+      "command": "dsh-acp",
+      "args": [],
       "env": {
         "DEEPSEEK_API_KEY": "..."
       }

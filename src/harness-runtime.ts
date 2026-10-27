@@ -354,12 +354,12 @@ export class CordisHarnessRuntime implements HarnessRuntime {
         })
         break
       case 'tool/result': {
-        const block = event.data.message.content[0]
+        const message = event.data.message
         record.options.onEvent({
           type: 'tool-result',
-          callId: String(block.toolCallId),
-          isError: block.isError === true || event.data.error !== undefined,
-          content: runtimeContent(block.content),
+          callId: String(message.toolCallId),
+          isError: message.isError === true || event.data.error !== undefined,
+          content: runtimeContent(message.content),
         })
         break
       }

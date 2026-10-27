@@ -1,5 +1,5 @@
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough, Readable, Writable } from 'node:stream'
@@ -12,20 +12,23 @@ const fixture = fileURLToPath(new URL('./fixtures/cli/', import.meta.url))
 const bin = fileURLToPath(new URL('../dist/bin.js', import.meta.url))
 let child: ChildProcessWithoutNullStreams | undefined
 
-afterEach(async () => {
-  if (child?.exitCode !== null) return
+async function stopChild() {
+  if (child?.exitCode !== null || child.signalCode !== null) return
   const running = child
   child = undefined
   const exited = new Promise<void>((resolve) => running.once('exit', () => resolve()))
   running.kill('SIGKILL')
   await exited
-})
+}
 
-describe.skipIf(!existsSync(bin))('built dsh-acp CLI', () => {
-  it('reports the npx command and package version', () => {
+afterEach(stopChild)
+
+describe('built dsh-acp CLI', () => {
+  it('reports the installed command, npx alternative and package version', () => {
     const help = spawnSync(process.execPath, [bin, '--help'], { encoding: 'utf8' })
     expect(help.status).toBe(0)
     expect(help.stderr).toBe('')
+    expect(help.stdout).toContain('dsh-acp [options]')
     expect(help.stdout).toContain('npx --yes @dumbo-ai/dsh-acp')
     expect(help.stdout).toContain('DEEPSEEK_BASE_URL')
     expect(help.stdout).toContain('DSH_PERMISSION_MODE')
@@ -86,6 +89,7 @@ describe.skipIf(!existsSync(bin))('built dsh-acp CLI', () => {
       expect(diagnostics.join('')).toBe('')
       child = undefined
     } finally {
+      await stopChild()
       rmSync(cwd, { recursive: true })
     }
   }, 30_000)

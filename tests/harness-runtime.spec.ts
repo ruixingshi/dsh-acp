@@ -3,6 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import {
   LlmAdapter,
   ReasoningEffortId,
+  ToolCallId,
   createUserMessage,
   type GenerateOptions,
   type StreamChunk,
@@ -12,6 +13,12 @@ import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-test
 import type { TurnEndReason } from '@deepseek-ai/dsh-session'
 import { CordisHarnessRuntime } from '../src/harness-runtime.js'
 import type { RuntimeEvent, RuntimeSession } from '../src/runtime.js'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'runtime-test': { kind: 'runtime-test' }
+  }
+}
 
 type Script = StreamChunk[] | 'error' | 'hang' | 'partial-error'
 
@@ -116,7 +123,7 @@ interface RuntimeHarness {
 async function makeHarness(script: Script[]): Promise<RuntimeHarness> {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx, {
-    systemPrompt: { personaPrefix: 'Selected {{model}} in {{cwd}}.' },
+    systemPrompt: { personaPrefix: 'Selected {{model}}.' },
   })
   await ctx.plugin(AgentLoop, { agents: [] })
   const adapter = new ScriptedAdapter(script)
@@ -204,6 +211,80 @@ describe('CordisHarnessRuntime', () => {
     ).toBe(true)
   })
 
+  it.each(['text', 'empty', 'failure'] as const)(
+    'projects a %s tool result from the Harness tool-role message',
+    async (outcome) => {
+      const callId = ToolCallId('fixture-call')
+      harness = await makeHarness([
+        [
+          { type: 'block-start', index: 0, blockType: 'tool-call' },
+          {
+            type: 'block-end',
+            index: 0,
+            block: { type: 'tool-call', id: callId, name: 'fixture', arguments: '{}' },
+          },
+          { type: 'finish', reason: { kind: 'tool-calls' } },
+        ],
+        answer('done'),
+      ])
+      const { ctx } = harness
+      ctx.effect(() =>
+        ctx.tools.register({
+          name: 'fixture',
+          description: 'Return a controlled result.',
+          parameters: { type: 'object', properties: {} },
+          output: {
+            schema: { type: 'null' },
+            render: () =>
+              outcome === 'empty'
+                ? []
+                : [
+                    { type: 'text', text: 'first' },
+                    { type: 'text', text: 'second' },
+                  ],
+          },
+          execute: () =>
+            outcome === 'failure'
+              ? Promise.reject(new Error('fixture failure'))
+              : Promise.resolve(null),
+        }),
+      )
+      const events: RuntimeEvent[] = []
+      const session = await createSession(harness.runtime, events)
+
+      await expect(session.prompt('use fixture')).resolves.toEqual({ kind: 'completed' })
+
+      const result = events.find((event) => event.type === 'tool-result')
+      expect(result).toMatchObject({
+        callId: 'fixture-call',
+        isError: outcome === 'failure',
+      })
+      if (outcome === 'failure') {
+        expect(result?.content).toHaveLength(1)
+        expect(result?.content[0]).toHaveProperty(
+          'text',
+          expect.stringContaining('fixture failure'),
+        )
+      } else {
+        expect(result?.content).toEqual(
+          outcome === 'empty'
+            ? []
+            : [
+                { type: 'text', text: 'first' },
+                { type: 'text', text: 'second' },
+              ],
+        )
+      }
+      expect(harness.adapter.requests[1]?.messages).toContainEqual(
+        expect.objectContaining({
+          role: 'tool',
+          toolCallId: callId,
+          isError: outcome === 'failure',
+        }),
+      )
+    },
+  )
+
   it('settles an explicit cancellation and drains the Harness driver', async () => {
     harness = await makeHarness(['hang'])
     const events: RuntimeEvent[] = []
@@ -275,12 +356,7 @@ describe('CordisHarnessRuntime', () => {
     const prompt = session.prompt('queued during maintenance')
     session.cancel()
 
-    await expect(
-      Promise.race([
-        prompt,
-        new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 100)),
-      ]),
-    ).resolves.toEqual({ kind: 'cancelled' })
+    await expect(prompt).resolves.toEqual({ kind: 'cancelled' })
     await maintenance
   })
 
@@ -318,7 +394,7 @@ describe('CordisHarnessRuntime', () => {
       agent.followup(
         createUserMessage({
           content: [{ type: 'text', text: 'replacement' }],
-          source: { kind: 'plugin', plugin: 'test' },
+          source: { kind: 'runtime-test' },
         }),
       )
     })
@@ -359,7 +435,7 @@ describe('CordisHarnessRuntime', () => {
       agent.inject(
         createUserMessage({
           content: [{ type: 'text', text: 'continue' }],
-          source: { kind: 'plugin', plugin: 'test' },
+          source: { kind: 'runtime-test' },
         }),
       )
     })

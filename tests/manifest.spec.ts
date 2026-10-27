@@ -26,7 +26,7 @@ describe('published manifest', () => {
 
   it('matches the Node.js versions supported by DeepSeek Harness', () => {
     const root = readManifest(join(process.cwd(), 'package.json'))
-    expect(root.engines?.node).toBe('^22.19.0 || >=24.0.0')
+    expect(root.engines?.node).toBe('>=24.9.0')
   })
 
   it('pins every directly consumed Harness package to the official CLI release', () => {
@@ -36,6 +36,7 @@ describe('published manifest', () => {
     expect(version).toBeDefined()
     expect(dependencies['@deepseek-ai/dsh-agent-spine-demo']).toBeUndefined()
     expect(dependencies['@deepseek-ai/dsh-code-runtime']).toBeUndefined()
+    expect(dependencies['@deepseek-ai/dsh-subagent-in-process-driver']).toBeUndefined()
     for (const [name, dependencyVersion] of Object.entries(dependencies).filter(([name]) =>
       isDshPackage(name),
     )) {

@@ -28,6 +28,7 @@ if (values.help === true) {
   process.stdout.write(`dsh-acp ${VERSION}
 
 Usage:
+  dsh-acp [options]
   npx --yes @dumbo-ai/dsh-acp [options]
 
 Options:

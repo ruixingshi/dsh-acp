@@ -1,19 +1,21 @@
 # DeepSeek Harness ACP
 
-`@dumbo-ai/dsh-acp` 为 DeepSeek Harness 官方 ACP 应用提供稳定的 `npx` 启动入口。0.4.1 默认使用 DeepSeek Harness `0.1.6-alpha.1` 维护的 `acp` profile，同时保留本包原有的 TypeScript 适配器 API 和完整 Cordis 配置模式，避免已有集成失效。
+`@dumbo-ai/dsh-acp` 让 Dumbo、Zed 等 ACP 客户端使用 DeepSeek Harness。当前版本 **0.5.0** 使用 Harness **`0.2.1-rc.4`**，默认配置随包提供，不需要自己准备 `cordis.yml`。
 
 [English](README.en.md)
 
 ## 快速开始
 
-需要 Node.js `^22.19.0` 或 `>=24.0.0`。
+需要 Node.js **`>=24.9.0`**。先全局安装：
 
 ```bash
-export DEEPSEEK_API_KEY='...'
-npx --yes @dumbo-ai/dsh-acp
+npm install -g @dumbo-ai/dsh-acp@0.5.0
+dsh-acp --version
 ```
 
-无参数启动会运行官方 DeepSeek Harness ACP profile。coding tools、sandbox、权限策略、模型目录、持久会话、MCP 接入和 ACP 生命周期都由官方 profile 维护。
+客户端启动命令填写 `dsh-acp`，参数留空，再配置 `DEEPSEEK_API_KEY`。这样每次启动直接使用已安装的包，不用等待 `npx` 下载。升级也执行上面的安装命令，完成后重启客户端。
+
+如果只想临时运行，也可以使用 `npx --yes @dumbo-ai/dsh-acp@0.5.0`。无参数启动使用官方 ACP profile，工具、模型和会话能力由 Harness 提供。
 
 启动器识别以下环境变量：
 
@@ -38,7 +40,7 @@ Harness 也会使用 `DSH_HOME` 下由它管理的设置和凭据文件。
 启动命令：
 
 ```bash
-npx --yes @dumbo-ai/dsh-acp --patch /absolute/path/to/acp.patch.yml
+dsh-acp --patch /absolute/path/to/acp.patch.yml
 ```
 
 patch 会替换目标条目的整个 `config`，所以目标条目需要的字段都应写全。
@@ -48,7 +50,7 @@ patch 会替换目标条目的整个 `config`，所以目标条目需要的字�
 为保持兼容，显式传入 `--config` 时，仍会在一棵完整 Cordis 配置树中启动本包原来的 rich adapter：
 
 ```bash
-npx --yes @dumbo-ai/dsh-acp --config /absolute/path/to/cordis.yml
+dsh-acp --config /absolute/path/to/cordis.yml
 ```
 
 如果启动目录存在 `./cordis.yml`，也会自动进入这个旧版模式。`--patch` 不能和这两种旧版入口同时使用。旧版 `cordis.yml` 必须描述完整的 Harness 组合，它不是官方 profile 的 overlay。
@@ -70,7 +72,7 @@ CLI 会把 stdout 专门留给 ACP JSON-RPC 帧，诊断信息写入 stderr。
 
 默认官方 profile 支持：
 
-- ACP v1 初始化和鉴权。
+- ACP v1 初始化，API Key 通过环境变量或 Harness 凭据配置提供。
 - 创建、列出、恢复、提示、取消和关闭持久会话。
 - 标准模型与推理强度配置项。
 - 有序文本和 resource link；当选中模型支持图片时，也支持相应的栅格图片输入。
@@ -81,6 +83,27 @@ CLI 会把 stdout 专门留给 ACP JSON-RPC 帧，诊断信息写入 stderr。
 
 当前不支持 session load、删除或 fork、additional directories、音频、embedded context、ACP mode 或 command、plan、terminal、客户端文件操作和 elicitation。未支持的能力会按 ACP 要求不声明或明确拒绝。
 
+## Dumbo / 飞象
+
+全局安装后，在本地 `acp-agent-config.json` 的 `acp_agent_servers` 中添加：
+
+```json
+{
+  "acp_agent_servers": {
+    "dsh": {
+      "type": "custom",
+      "command": "dsh-acp",
+      "args": [],
+      "env": {
+        "DEEPSEEK_API_KEY": "替换成你的 API Key"
+      }
+    }
+  }
+}
+```
+
+保留文件中的其他 Agent。若客户端找不到命令，执行 `command -v dsh-acp`，把输出的绝对路径填入 `command`。首次修改配置后重新招募该 Agent；以后仅升级包时，启动路径不变，重启客户端即可。
+
 ## Zed
 
 添加一个自定义 External Agent：
@@ -90,8 +113,8 @@ CLI 会把 stdout 专门留给 ACP JSON-RPC 帧，诊断信息写入 stderr。
   "agent_servers": {
     "dsh-acp": {
       "type": "custom",
-      "command": "npx",
-      "args": ["--yes", "@dumbo-ai/dsh-acp"],
+      "command": "dsh-acp",
+      "args": [],
       "env": {
         "DEEPSEEK_API_KEY": "..."
       }
