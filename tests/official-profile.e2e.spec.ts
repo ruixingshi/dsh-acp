@@ -1,6 +1,6 @@
 /** Exercise the published launcher and official ACP profile through its wire API. */
 import { spawn } from 'node:child_process'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable, Writable } from 'node:stream'
@@ -20,13 +20,17 @@ import { describe, expect, it } from 'vitest'
 const bin =
   process.env.DSH_ACP_TEST_BIN ?? fileURLToPath(new URL('../dist/bin.js', import.meta.url))
 const patch = fileURLToPath(new URL('./fixtures/official/acp.patch.yml', import.meta.url))
+const autonomousPatch = fileURLToPath(
+  new URL('./fixtures/official/autonomous.patch.yml', import.meta.url),
+)
 const mcp = fileURLToPath(new URL('./fixtures/official/mcp.mjs', import.meta.url))
 const mcpServers: McpServer[] = [
   { name: 'fixture', command: process.execPath, args: [mcp], env: [] },
 ]
 
-function launch(cwd: string) {
-  const child = spawn(process.execPath, [bin, '--patch', patch], {
+function launch(cwd: string, patches: string[] = []) {
+  const args = [bin, '--patch', patch, ...patches.flatMap((path) => ['--patch', path])]
+  const child = spawn(process.execPath, args, {
     cwd,
     env: {
       ...process.env,
@@ -129,7 +133,7 @@ function reply(updates: SessionUpdate[]): string {
     .join('')
 }
 
-describe('official Harness ACP compatibility', () => {
+describe('direct Harness ACP v1 compatibility', () => {
   it('publishes plans, titles and tool categories by default and restores display after restart', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'dsh-acp-display-'))
     await writeFile(join(cwd, 'fixture.txt'), 'fixture content')
@@ -184,6 +188,11 @@ describe('official Harness ACP compatibility', () => {
           kind: 'read',
         }),
       )
+      const beforeResume = process.updates.length
+      const synchronized = process.waitForUpdate((update) => update.sessionUpdate === 'plan')
+      await process.agent.request(methods.agent.session.resume, { sessionId, cwd, mcpServers })
+      await synchronized
+      expect(reply(process.updates.slice(beforeResume))).toBe('')
       await process.agent.request(methods.agent.session.close, { sessionId })
       await process.finish()
       process = launch(cwd)
@@ -218,7 +227,7 @@ describe('official Harness ACP compatibility', () => {
     }
   }, 30_000)
 
-  it('keeps official history pagination and cwd filtering while adding cached titles', async () => {
+  it('keeps history pagination and cwd filtering while adding cached titles', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'dsh-acp-list-'))
     const otherCwd = join(cwd, 'other')
     await mkdir(otherCwd)
@@ -440,6 +449,44 @@ describe('official Harness ACP compatibility', () => {
       await process.finish()
     } finally {
       await process.stop()
+      await rm(cwd, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('rejects concurrent v1 prompts while Harness is running an autonomous turn', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'dsh-acp-v1-autonomous-'))
+    const server = launch(cwd, [autonomousPatch])
+    try {
+      await server.agent.request(methods.agent.initialize, {
+        protocolVersion: 1,
+        clientCapabilities: {},
+      })
+      const { sessionId } = await server.agent.request(methods.agent.session.new, {
+        cwd,
+        mcpServers,
+      })
+      const toolFinished = server.waitForUpdate(
+        (update) => update.sessionUpdate === 'tool_call_update' && update.status === 'completed',
+      )
+      await writeFile(join(cwd, 'autonomous.tmp'), JSON.stringify({ sessionId, text: 'gate' }))
+      await rename(join(cwd, 'autonomous.tmp'), join(cwd, 'autonomous.json'))
+      await toolFinished
+      await expect(
+        server.agent.request(methods.agent.session.prompt, {
+          sessionId,
+          prompt: [{ type: 'text', text: 'must-not-insert' }],
+        }),
+      ).rejects.toMatchObject({ code: -32602 })
+      const answered = server.waitForUpdate(
+        (update) => update.sessionUpdate === 'agent_message_chunk',
+      )
+      await writeFile(join(cwd, 'release'), '')
+      await answered
+      expect(reply(server.updates)).toContain('tool=5; turns=1')
+      await server.agent.request(methods.agent.session.close, { sessionId })
+      await server.finish()
+    } finally {
+      await server.stop()
       await rm(cwd, { recursive: true, force: true })
     }
   }, 30_000)

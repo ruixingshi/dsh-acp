@@ -5,3 +5,5 @@ coverage/
 *.log
 .env
 .npmrc
+.references/
+.artifacts/

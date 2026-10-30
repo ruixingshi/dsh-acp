@@ -1,5 +1,33 @@
 /** Deterministic provider; all ACP, Agent, tool and persistence code remains real. */
 import { LlmAdapter, ReasoningEffortId, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { watch } from 'node:fs'
+import { access } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+
+async function waitForRelease(signal) {
+  const path = join(dirname(process.env.DSH_ACP_TEST_FILE), 'release')
+  let watcher
+  let onAbort
+  try {
+    await new Promise((resolve, reject) => {
+      const check = () =>
+        access(path).then(resolve, (error) => {
+          if (error.code !== 'ENOENT') reject(error)
+        })
+      watcher = watch(dirname(path), () => {
+        void check()
+      })
+      watcher.on('error', reject)
+      onAbort = () => reject(new Error('cancelled'))
+      signal.addEventListener('abort', onAbort, { once: true })
+      if (signal.aborted) onAbort()
+      else void check()
+    })
+  } finally {
+    watcher?.close()
+    if (onAbort) signal.removeEventListener('abort', onAbort)
+  }
+}
 
 function* callTool(id, name, args) {
   const argumentsText = JSON.stringify(args)
@@ -111,6 +139,7 @@ class FixtureAdapter extends LlmAdapter {
       yield { type: 'finish', reason: { kind: 'tool-calls' } }
       return
     }
+    if (prompt === 'gate') await waitForRelease(options.signal)
     if (prompt === 'cancel') {
       await new Promise((_resolve, reject) => {
         if (options.signal.aborted) return reject(new Error('cancelled'))

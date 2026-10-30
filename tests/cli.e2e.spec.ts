@@ -32,7 +32,7 @@ describe('built dsh-acp CLI', () => {
     expect(help.stdout).toContain('DEEPSEEK_BASE_URL')
     expect(help.stdout).toContain('DSH_PERMISSION_MODE')
     expect(help.stdout).toContain('--patch <path>')
-    expect(help.stdout).toContain('official ACP profile')
+    expect(help.stdout).toContain('ACP v1/v2')
 
     const version = spawnSync(process.execPath, [bin, '--version'], { encoding: 'utf8' })
     expect(version.status).toBe(0)
@@ -40,7 +40,7 @@ describe('built dsh-acp CLI', () => {
     expect(version.stdout).toBe(`${VERSION}\n`)
   })
 
-  it('boots the official ACP profile and publishes model options', async () => {
+  it('boots the Harness profile and publishes model options', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'dsh-acp-cli-'))
     const diagnostics: string[] = []
     writeFileSync(join(cwd, 'cordis.yml'), 'this is not a Cordis config: [')

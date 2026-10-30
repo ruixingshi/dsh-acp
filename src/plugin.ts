@@ -1,49 +1,64 @@
-/** Official Harness ACP with standard plan, title, and tool-category display updates. */
+/** Direct Harness ACP endpoint with SDK version negotiation. */
 import type { Context } from '@deepseek-ai/cordis'
 import {
-  Config,
-  apply as applyOfficial,
-  inject as officialInject,
-  type AcpConfig,
-} from '@deepseek-ai/dsh-acp'
-import { ndJsonStream } from '@agentclientprotocol/sdk'
+  agentProtocolRouter,
+  ndJsonStream,
+  type AnyWireMessage,
+} from '@agentclientprotocol/sdk/experimental/v2'
 import { Readable, Writable } from 'node:stream'
-import { PresentationStream } from './presentation-stream.js'
+import { type DshAcpConfig } from './config.js'
+import { HarnessRuntime } from './harness/runtime.js'
+import { v1Agent } from './protocol/v1.js'
+import { v2Agent } from './protocol/v2.js'
 
-export { Config }
-export type { AcpConfig as DshAcpConfig }
-/** Cordis plugin name. */
+export { Config, type DshAcpConfig } from './config.js'
 export const name = 'dsh-acp'
-/** Official runtime services plus live projections and persisted title checkpoints. */
-export const inject = [...officialInject, 'sessionProjections', 'sessionProjectionCache']
+export const inject = [
+  'agents',
+  'llm',
+  'sessionPersistence',
+  'sessions',
+  'sessionProjections',
+  'sessionProjectionCache',
+]
 
-/**
- * Mount the official server; its cleanup completes before display transport disposal.
- * @param ctx - context from the Harness ACP profile.
- * @param config - official ACP settings, including an optional in-process transport.
- */
-export function apply(ctx: Context, config: AcpConfig): void {
-  ctx.effect(() => {
-    const transport =
-      config.stream ??
-      ndJsonStream(
-        Writable.toWeb(process.stdout) as WritableStream<Uint8Array>,
-        Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>,
-      )
-    const presentation = new PresentationStream(ctx, transport)
-    // Also release transport locks if the official plugin throws during activation.
-    ctx.effect(() => () => presentation.dispose(), 'dsh-acp.transport')
-    const disposeOfficial = ctx.effect(() => {
-      applyOfficial(ctx, { ...config, stream: presentation.stream })
-      return () => undefined
-    }, 'dsh-acp.official')
-    return async () => {
-      // Display cleanup still runs if official persistence or Agent disposal fails.
-      try {
-        await disposeOfficial()
-      } finally {
-        await presentation.dispose()
-      }
-    }
-  }, 'dsh-acp.presentation')
+/** Mount one version-negotiated connection; disposal drains all owned agents. */
+export function apply(ctx: Context, config: DshAcpConfig): void {
+  const runtime = new HarnessRuntime(ctx, config)
+  const logger = ctx.logger
+  const transport =
+    config.stream ??
+    ndJsonStream(
+      Writable.toWeb(process.stdout) as WritableStream<Uint8Array>,
+      Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>,
+    )
+  const abort = new AbortController()
+  const fail = (error: unknown): void => {
+    if (abort.signal.aborted) return
+    logger.warn(`dsh-acp: transport failed: ${String(error)}`)
+    abort.abort(error)
+  }
+  const connection = agentProtocolRouter()
+    .withV1(v1Agent(runtime, fail))
+    .withV2(v2Agent(runtime, fail))
+    .connect({
+      ...transport,
+      readable: transport.readable.pipeThrough(
+        new TransformStream<AnyWireMessage, AnyWireMessage>(),
+        { signal: abort.signal },
+      ),
+    })
+  void connection.closed
+    .then(() => {
+      abort.abort()
+      return runtime.close()
+    })
+    .catch((error: unknown) => logger.warn(`dsh-acp: teardown failed: ${String(error)}`))
+  ctx.effect(
+    () => async () => {
+      abort.abort()
+      await runtime.close()
+    },
+    'dsh-acp.connection',
+  )
 }

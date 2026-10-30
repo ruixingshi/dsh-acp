@@ -1,6 +1,6 @@
 # ADR 0002: Official ACP with default presentation
 
-Status: Accepted for 0.6.0; supersedes the independent adapter in ADR 0001.
+Status: Shipped in 0.6.0; superseded in 0.7.0 by [ADR 0003](0003-direct-acp-v1-v2.md).
 
 ## Decision
 

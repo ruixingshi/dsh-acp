@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Launch the official Harness ACP profile with the bundled presentation plugin. */
+/** Launch the Harness profile with the direct ACP v1/v2 plugin. */
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { VERSION } from './version.js'
@@ -31,7 +31,7 @@ Options:
   -v, --version        Show the package version
 
 Default runtime:
-  DeepSeek Harness official ACP profile with plans, titles and tool categories
+  Direct DeepSeek Harness ACP v1/v2 with plans, titles and tool categories
   Custom model settings target the dsh-acp entry in a --patch overlay.
 
 Environment:

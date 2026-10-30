@@ -1,4 +1,4 @@
-# Use one official ACP server, decorated with standard presentation updates.
+# Replace the official ACP server with the direct v1/v2 adapter.
 - id: acp
   disabled: true
 - insert:
